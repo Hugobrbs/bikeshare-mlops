@@ -65,6 +65,7 @@ def test_first_run_trains_and_promotes(store: BatchStore, mlflow_client: MlflowC
     run = mlflow_client.get_run(summary["mlflow_run_id"])
     assert run.info.status == "FINISHED"
     assert run.data.tags["batch_ids"] == "2011-01,2011-02"
+    assert run.data.tags["training_batches"] == "2011-01,2011-02"
     assert run.data.tags["decision"] == "approved"
     assert run.data.params["window_months"] == "12"
     assert {"test.mae", "baseline.mae", "test.rush_hours.mae"} <= set(run.data.metrics)
@@ -107,6 +108,29 @@ def test_invalid_batch_stops_the_run_and_keeps_the_champion(
 
     # le lot est relivré propre au cycle suivant : le pipeline repart tout seul
     assert training_pipeline()["batch_ids"] == ["2011-03"]
+
+
+def test_rejected_batch_is_redelivered_before_the_ones_already_waiting(
+    store: BatchStore, mlflow_client: MlflowClient
+) -> None:
+    training_pipeline()
+    source = store.source_dir / "hour.csv"
+    publish_batches(
+        source,
+        store.incoming_dir,
+        delivered=store.delivered_ids(),
+        corruption=Corruption.MISSING_HOURS,
+    )
+    publish_batches(source, store.incoming_dir, delivered=store.delivered_ids())
+    with pytest.raises(DataValidationError, match="2011-03"):
+        training_pipeline()
+
+    summary = training_pipeline()
+
+    # sans relivraison de mars, avril serait rejeté pour rupture de continuité
+    assert summary["batch_ids"] == ["2011-03", "2011-04"]
+    run = mlflow_client.get_run(summary["mlflow_run_id"])
+    assert run.data.tags["training_batches"] == "2011-01,2011-02,2011-03,2011-04"
 
 
 def test_nothing_to_do_once_the_source_is_exhausted(store: BatchStore) -> None:

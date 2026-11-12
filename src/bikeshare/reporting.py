@@ -44,3 +44,7 @@ def forecast_figure(model: Pipeline, test: pd.DataFrame) -> Figure:
     figure.autofmt_xdate()
     figure.tight_layout()
     return figure
+
+
+def close_figure(figure: Figure) -> None:
+    plt.close(figure)
