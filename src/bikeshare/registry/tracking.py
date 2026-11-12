@@ -95,21 +95,23 @@ class TrainingRun:
         # si la publication est rejouée après un échec partiel, on ne crée pas une 2e version
         existing = self.client.search_model_versions(f"run_id='{self.run_id}'")
         if existing:
-            return RegisteredVersion(registered_name, str(existing[0].version), self.run_id)
+            version = str(existing[0].version)
+        else:
+            inputs = sample[list(INPUT_COLUMNS)]
+            with mlflow.start_run(run_id=self.run_id):
+                info = mlflow.sklearn.log_model(
+                    sk_model=model,
+                    name="model",
+                    registered_model_name=registered_name,
+                    signature=mlflow.models.infer_signature(inputs, model.predict(inputs)),
+                    input_example=inputs.head(3),
+                    skops_trusted_types=SKOPS_TRUSTED_TYPES,
+                )
+            # sortir du with clôt le run, on le rouvre : il reste des choses à journaliser
+            self.client.update_run(self.run_id, status="RUNNING")
+            version = str(info.registered_model_version)
 
-        inputs = sample[list(INPUT_COLUMNS)]
-        with mlflow.start_run(run_id=self.run_id):
-            info = mlflow.sklearn.log_model(
-                sk_model=model,
-                name="model",
-                registered_model_name=registered_name,
-                signature=mlflow.models.infer_signature(inputs, model.predict(inputs)),
-                input_example=inputs.head(3),
-                skops_trusted_types=SKOPS_TRUSTED_TYPES,
-            )
-        # sortir du with clôt le run, on le rouvre : il reste des choses à journaliser
-        self.client.update_run(self.run_id, status="RUNNING")
-        version = str(info.registered_model_version)
+        # dans les deux cas : l'échec qui a provoqué la relance a pu survenir avant les tags
         for key, value in (version_tags or {}).items():
             self.client.set_model_version_tag(registered_name, version, key, value)
         return RegisteredVersion(registered_name, version, self.run_id)
