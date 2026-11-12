@@ -20,11 +20,13 @@ data_app = typer.Typer(help="Téléchargement du dataset et rejeu par lots.", no
 pipeline_app = typer.Typer(help="Pipeline d'entraînement (Prefect).", no_args_is_help=True)
 registry_app = typer.Typer(help="Registre de modèles (MLflow).", no_args_is_help=True)
 db_app = typer.Typer(help="Base PostgreSQL.", no_args_is_help=True)
+api_app = typer.Typer(help="API de prédiction.", no_args_is_help=True)
 alerts_app = typer.Typer(help="Récepteur d'alertes.", no_args_is_help=True)
 app.add_typer(data_app, name="data")
 app.add_typer(pipeline_app, name="pipeline")
 app.add_typer(registry_app, name="registry")
 app.add_typer(db_app, name="db")
+app.add_typer(api_app, name="api")
 app.add_typer(alerts_app, name="alerts")
 
 logger = logging.getLogger(__name__)
@@ -257,6 +259,22 @@ def db_init() -> None:
         },
     )
     typer.echo("base initialisée")
+
+
+@api_app.command("serve")
+def api_serve() -> None:
+    """Lance l'API (API_HOST, API_PORT, API_WORKERS)."""
+    import uvicorn
+
+    settings = get_settings()
+    uvicorn.run(
+        "bikeshare.api.app:create_app",
+        factory=True,
+        host=settings.api_host,
+        port=settings.api_port,
+        workers=settings.api_workers,
+        access_log=False,
+    )
 
 
 @alerts_app.command("serve")

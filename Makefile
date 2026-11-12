@@ -53,8 +53,8 @@ down: ## Arrête la stack (les volumes sont conservés)
 ps: ## Etat des services
 	docker compose ps
 
-logs: ## Suit les logs du pipeline
-	docker compose logs -f pipeline
+logs: ## Suit les logs du pipeline et de l'API
+	docker compose logs -f pipeline api
 
 train: ## Déclenche tout de suite un cycle d'entraînement
 	$(PIPELINE) prefect deployment run bikeshare-training/replay-mensuel
