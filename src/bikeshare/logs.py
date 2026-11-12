@@ -32,3 +32,6 @@ def configure_logging(level: str = "INFO", fmt: str = "text") -> None:
     root = logging.getLogger()
     root.handlers[:] = [handler]
     root.setLevel(level.upper())
+    # bibliothèques trop bavardes en INFO (une ligne par requête HTTP, détails internes de GX)
+    for noisy in ("httpx", "great_expectations"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)

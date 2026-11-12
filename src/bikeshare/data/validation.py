@@ -12,9 +12,6 @@ from great_expectations.data_context.types.base import ProgressBarsConfig
 from bikeshare.data.schema import SOURCE_COLUMNS
 from bikeshare.pipeline_config import ValidationConfig
 
-# GX journalise en INFO chaque dossier temporaire qu'il crée
-logging.getLogger("great_expectations").setLevel(logging.WARNING)
-
 REQUIRED = ("dteday", "hr", "weathersit", "temp", "atemp", "hum", "windspeed", "cnt")
 NORMALIZED = ("temp", "atemp", "hum", "windspeed")
 BATCH_ID = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
@@ -90,6 +87,8 @@ def validate_batch(
     if not BATCH_ID.match(batch_id):
         raise ValueError(f"identifiant de lot invalide : {batch_id!r} (attendu AAAA-MM)")
 
+    # GX journalise en INFO chaque dossier temporaire qu'il crée
+    logging.getLogger("great_expectations.data_context.types.base").setLevel(logging.WARNING)
     expectations = build_expectations(batch_id, rules)
     context = gx.get_context(mode="ephemeral")
     context.variables.progress_bars = ProgressBarsConfig(globally=False)
