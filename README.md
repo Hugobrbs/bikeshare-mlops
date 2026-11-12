@@ -61,6 +61,7 @@ L'API devient prête dans la minute qui suit (`curl localhost:8001/health/ready`
 make ps        # état des services
 make logs      # logs du pipeline
 make down      # arrêt, les volumes sont conservés
+make reset     # arrêt et suppression des volumes, pour repartir de zéro
 ```
 
 ## Données

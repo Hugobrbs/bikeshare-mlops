@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 .PHONY: help install lint format test test-integration cov audit clean \
-	up down ps logs train incident-data registry-status rollback loadtest-ui loadtest
+	up down reset ps logs train incident-data registry-status rollback loadtest-ui loadtest
 
 PIPELINE = docker compose exec pipeline
 TEST_DB = postgresql://postgres:test@127.0.0.1:55432/bikeshare_test
@@ -49,6 +49,9 @@ up: ## Démarre toute la stack (crée .env à partir de .env.example si besoin)
 
 down: ## Arrête la stack (les volumes sont conservés)
 	docker compose down
+
+reset: ## Supprime les conteneurs ET les volumes (données, modèles, traces) pour repartir de zéro
+	docker compose down --volumes
 
 ps: ## Etat des services
 	docker compose ps
