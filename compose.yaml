@@ -20,6 +20,9 @@ x-common-env: &common-env
   MLFLOW_ENABLE_ARTIFACTS_PROGRESS_BAR: "false"
   MLFLOW_SUPPRESS_PRINTING_URL_TO_STDOUT: "true"
   GIT_PYTHON_REFRESH: quiet
+  # par défaut le client mlflow réessaie pendant plusieurs minutes quand le serveur est arrêté
+  MLFLOW_HTTP_REQUEST_MAX_RETRIES: "2"
+  MLFLOW_HTTP_REQUEST_TIMEOUT: "20"
 
 services:
   postgres:
@@ -155,9 +158,6 @@ services:
       API_DATABASE_URL: postgresql://api_writer:${API_DB_PASSWORD:-bikeshare-local-api}@postgres:5432/bikeshare
       API_DB_POOL_MAX: ${API_DB_POOL_MAX:-5}
       MODEL_REFRESH_SECONDS: ${MODEL_REFRESH_SECONDS:-30}
-      # si mlflow est arrêté, on abandonne vite au lieu de réessayer pendant des minutes
-      MLFLOW_HTTP_REQUEST_MAX_RETRIES: "1"
-      MLFLOW_HTTP_REQUEST_TIMEOUT: "10"
       HEARTBEAT_SECONDS: ${HEARTBEAT_SECONDS:-15}
       ADMIN_TOKEN: ${ADMIN_TOKEN:-bikeshare-local-admin-token}
     ports:
@@ -178,7 +178,34 @@ services:
       timeout: 5s
       retries: 6
 
+  grafana:
+    image: grafana/grafana:13.2.3
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-bikeshare-local-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/dashboards/api.json
+      # lu par le provisioning de la source de données
+      GRAFANA_DB_PASSWORD: ${GRAFANA_DB_PASSWORD:-bikeshare-local-grafana}
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
 volumes:
   postgres_data:
   mlflow_data:
   pipeline_data:
+  grafana_data:
