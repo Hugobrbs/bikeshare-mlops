@@ -1,0 +1,148 @@
+name: bikeshare
+
+x-api-image: &api-image
+  image: bikeshare-api:local
+  build:
+    context: .
+    target: api
+    args:
+      APP_REVISION: ${APP_REVISION:-dev}
+
+x-common-env: &common-env
+  ENVIRONMENT: ${ENVIRONMENT:-local}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  LOG_FORMAT: ${LOG_FORMAT:-text}
+  MLFLOW_TRACKING_URI: http://mlflow:7281
+  MODEL_NAME: ${MODEL_NAME:-bikeshare-demand}
+  MODEL_ALIAS: ${MODEL_ALIAS:-champion}
+  # mlflow : pas de barres de progression ni de messages décoratifs dans les logs
+  MLFLOW_DISABLE_AGENT_HINT: "1"
+  MLFLOW_ENABLE_ARTIFACTS_PROGRESS_BAR: "false"
+  MLFLOW_SUPPRESS_PRINTING_URL_TO_STDOUT: "true"
+  GIT_PYTHON_REFRESH: quiet
+
+services:
+  postgres:
+    image: postgres:18.6-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bikeshare
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bikeshare-local-postgres}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./docker/postgres/create-prefect-db.sql:/docker-entrypoint-initdb.d/create-prefect-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d bikeshare"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # crée les rôles et les tables puis s'arrête
+  db-init:
+    <<: *api-image
+    command: ["bikeshare", "db", "init"]
+    environment:
+      ADMIN_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-bikeshare-local-postgres}@postgres:5432/bikeshare
+      API_DB_PASSWORD: ${API_DB_PASSWORD:-bikeshare-local-api}
+      OPS_DB_PASSWORD: ${OPS_DB_PASSWORD:-bikeshare-local-pipeline}
+      GRAFANA_DB_PASSWORD: ${GRAFANA_DB_PASSWORD:-bikeshare-local-grafana}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v3.17.2
+    restart: unless-stopped
+    entrypoint: ["mlflow"]
+    command:
+      - server
+      - --host=0.0.0.0
+      - --port=7281
+      - --workers=1
+      - --backend-store-uri=sqlite:////mlflow/mlflow.db
+      - --serve-artifacts
+      - --artifacts-destination=/mlflow/artifacts
+      - --allowed-hosts=localhost:*,127.0.0.1:*,mlflow:7281
+    ports:
+      - "127.0.0.1:${MLFLOW_PORT:-7281}:7281"
+    volumes:
+      - mlflow_data:/mlflow
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7281/health', timeout=5)"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+
+  prefect:
+    image: prefecthq/prefect:3.8.8-python3.12
+    restart: unless-stopped
+    command: ["prefect", "server", "start", "--host", "0.0.0.0", "--port", "4200"]
+    environment:
+      # postgres plutôt que sqlite : sinon le serveur ne voit pas une automation créée après son démarrage
+      PREFECT_SERVER_DATABASE_CONNECTION_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-bikeshare-local-postgres}@postgres:5432/prefect
+      PREFECT_SERVER_UI_API_URL: http://localhost:${PREFECT_PORT:-4200}/api
+      PREFECT_API_URL: http://127.0.0.1:4200/api
+      PREFECT_SERVER_ANALYTICS_ENABLED: "false"
+    ports:
+      - "127.0.0.1:${PREFECT_PORT:-4200}:4200"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4200/api/health', timeout=5)"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+
+  alert-sink:
+    <<: *api-image
+    restart: unless-stopped
+    command: ["bikeshare", "alerts", "serve"]
+    environment:
+      <<: *common-env
+      API_HOST: 0.0.0.0
+      OPS_DATABASE_URL: postgresql://pipeline_writer:${OPS_DB_PASSWORD:-bikeshare-local-pipeline}@postgres:5432/bikeshare
+      ALERT_FORWARD_URL: ${ALERT_FORWARD_URL:-}
+    ports:
+      - "127.0.0.1:${ALERT_SINK_PORT:-8002}:8002"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+
+  pipeline:
+    image: bikeshare-pipeline:local
+    build:
+      context: .
+      target: pipeline
+      args:
+        APP_REVISION: ${APP_REVISION:-dev}
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      PREFECT_API_URL: http://prefect:4200/api
+      # fait remonter les logs de nos modules dans l'interface Prefect
+      PREFECT_LOGGING_EXTRA_LOGGERS: bikeshare
+      OPS_DATABASE_URL: postgresql://pipeline_writer:${OPS_DB_PASSWORD:-bikeshare-local-pipeline}@postgres:5432/bikeshare
+      PIPELINE_SCHEDULE_SECONDS: ${PIPELINE_SCHEDULE_SECONDS:-600}
+      ALERT_SINK_URL: http://alert-sink:8002/alerts
+    volumes:
+      - pipeline_data:/app/data
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      mlflow:
+        condition: service_healthy
+      prefect:
+        condition: service_healthy
+      alert-sink:
+        condition: service_started
+
+volumes:
+  postgres_data:
+  mlflow_data:
+  pipeline_data:
