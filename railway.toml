@@ -1,0 +1,10 @@
+# Déploiement de l'API seule sur Railway (les autres services restent locaux).
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "sh -c 'API_HOST=0.0.0.0 API_PORT=$PORT bikeshare api serve'"
+healthcheckPath = "/health/live"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"
