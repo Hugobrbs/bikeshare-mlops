@@ -17,8 +17,10 @@ app = typer.Typer(
 )
 data_app = typer.Typer(help="Téléchargement du dataset et rejeu par lots.", no_args_is_help=True)
 registry_app = typer.Typer(help="Registre de modèles (MLflow).", no_args_is_help=True)
+db_app = typer.Typer(help="Base PostgreSQL.", no_args_is_help=True)
 app.add_typer(data_app, name="data")
 app.add_typer(registry_app, name="registry")
+app.add_typer(db_app, name="db")
 
 
 @app.callback()
@@ -168,3 +170,30 @@ def registry_rollback(
         typer.echo(f"refusé : {e}", err=True)
         raise typer.Exit(1) from e
     typer.echo(f"champion : v{change.from_version} -> v{change.to_version}")
+
+
+@db_app.command("init")
+def db_init() -> None:
+    """Crée les rôles, les schémas et les tables (rejouable)."""
+    from bikeshare.db.migrate import init_database
+
+    settings = get_settings()
+    secrets = {
+        "ADMIN_DATABASE_URL": settings.admin_database_url,
+        "API_DB_PASSWORD": settings.api_db_password,
+        "OPS_DB_PASSWORD": settings.ops_db_password,
+        "GRAFANA_DB_PASSWORD": settings.grafana_db_password,
+    }
+    missing = [name for name, value in secrets.items() if value is None]
+    if missing:
+        typer.echo(f"variables manquantes : {', '.join(missing)}", err=True)
+        raise typer.Exit(2)
+    init_database(
+        settings.admin_database_url.get_secret_value(),
+        {
+            "api_writer": settings.api_db_password.get_secret_value(),
+            "pipeline_writer": settings.ops_db_password.get_secret_value(),
+            "grafana_reader": settings.grafana_db_password.get_secret_value(),
+        },
+    )
+    typer.echo("base initialisée")
