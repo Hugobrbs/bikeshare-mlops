@@ -18,6 +18,7 @@ class Settings(BaseSettings):
 
     data_dir: Path = Path("data")
     pipeline_config: Path = Path("config/pipeline.yaml")
+    promotion_policy: Path = Path("config/promotion-policy.yaml")
 
     mlflow_tracking_uri: str = "http://localhost:7281"
     mlflow_experiment_name: str = "bikeshare-demand"
