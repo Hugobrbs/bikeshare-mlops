@@ -135,7 +135,7 @@ def predict_and_trace(
         # on ne répond 200 qu'une fois la requête et toutes ses prédictions écrites
         service.repository.save_predictions(trace, model.model_id, rows)
     except STORAGE_ERRORS as e:
-        logger.error("prédictions non enregistrées", extra={"request_id": str(trace.request_id)})
+        logger.error("prédictions non enregistrées, request_id=%s", trace.request_id)
         raise storage_unavailable() from e
 
     predictions = [
@@ -244,16 +244,23 @@ def create_app(
         request: Request, status: int, code: str, message: str
     ) -> JSONResponse:
         request_id: UUID = getattr(request.state, "request_id", None) or uuid4()
-        if request.url.path in TRACED_ENDPOINTS and hasattr(request.state, "t0"):
+        should_trace = request.url.path in TRACED_ENDPOINTS and hasattr(request.state, "t0")
+        # si c'est la base qui est en panne, inutile d'attendre une seconde fois une connexion
+        lost = should_trace and code == "storage_unavailable"
+        if should_trace and not lost:
             trace = service.trace(request, status, error_code=code)
             try:
                 await run_in_threadpool(service.repository.save_request, trace)
             except STORAGE_ERRORS:
-                # base indisponible : il reste ce log, avec l'identifiant rendu au client
-                logger.error(
-                    "trace d'erreur non enregistrée",
-                    extra={"request_id": str(request_id), "status": status, "code": code},
-                )
+                lost = True
+        if lost:
+            # il ne reste que ce log, avec l'identifiant rendu au client
+            logger.error(
+                "erreur non tracée en base, request_id=%s statut=%s code=%s",
+                request_id,
+                status,
+                code,
+            )
         return JSONResponse(
             status_code=status,
             content={"request_id": str(request_id), "error": {"code": code, "message": message}},

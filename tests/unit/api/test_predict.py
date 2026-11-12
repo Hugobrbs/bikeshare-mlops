@@ -120,7 +120,10 @@ def test_no_model_loaded(
 
 
 def test_database_down_means_no_fake_success(
-    client: TestClient, repository: FakeRepository, observation: dict
+    client: TestClient,
+    repository: FakeRepository,
+    observation: dict,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     repository.available = False
 
@@ -128,8 +131,23 @@ def test_database_down_means_no_fake_success(
 
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "storage_unavailable"
-    assert "request_id" in response.json()
     assert repository.predictions == {}
+    # sans base, le log est la seule trace : il doit porter l'identifiant rendu au client
+    assert response.json()["request_id"] in caplog.text
+
+
+def test_invalid_input_while_database_is_down(
+    client: TestClient,
+    repository: FakeRepository,
+    observation: dict,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    repository.available = False
+
+    response = client.post("/predict", json={"observation": {**observation, "weather_code": 9}})
+
+    assert response.status_code == 422
+    assert response.json()["request_id"] in caplog.text
 
 
 def test_unexpected_error_does_not_leak_details(
