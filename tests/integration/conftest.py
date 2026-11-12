@@ -3,6 +3,7 @@ from collections.abc import Iterator
 
 import psycopg
 import pytest
+from prefect.testing.utilities import prefect_test_harness
 
 from bikeshare.db.migrate import init_database
 
@@ -45,3 +46,10 @@ def admin(database: str) -> Iterator[psycopg.Connection]:
     with psycopg.connect(database, autocommit=True) as conn:
         conn.execute(f"TRUNCATE {', '.join(TABLES)} CASCADE")
         yield conn
+
+
+@pytest.fixture(scope="session")
+def prefect_server() -> Iterator[None]:
+    """Serveur Prefect temporaire : les flows tournent avec le vrai moteur d'orchestration."""
+    with prefect_test_harness():
+        yield
