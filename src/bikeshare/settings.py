@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -31,6 +31,15 @@ class Settings(BaseSettings):
     api_db_password: SecretStr | None = None
     ops_db_password: SecretStr | None = None
     grafana_db_password: SecretStr | None = None
+
+    # adresse d'écoute des services HTTP (0.0.0.0 dans un conteneur)
+    api_host: str = "127.0.0.1"
+
+    pipeline_schedule_seconds: int = Field(default=600, ge=30)
+    # adresse du récepteur d'alertes vue depuis le serveur Prefect
+    alert_sink_url: str = "http://localhost:8002/alerts"
+    alert_sink_port: int = 8002
+    alert_forward_url: SecretStr | None = None
 
 
 @lru_cache(maxsize=1)

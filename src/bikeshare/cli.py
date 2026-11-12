@@ -1,4 +1,5 @@
 import json
+import logging
 
 import typer
 
@@ -16,11 +17,17 @@ app = typer.Typer(
     pretty_exceptions_enable=False,
 )
 data_app = typer.Typer(help="Téléchargement du dataset et rejeu par lots.", no_args_is_help=True)
+pipeline_app = typer.Typer(help="Pipeline d'entraînement (Prefect).", no_args_is_help=True)
 registry_app = typer.Typer(help="Registre de modèles (MLflow).", no_args_is_help=True)
 db_app = typer.Typer(help="Base PostgreSQL.", no_args_is_help=True)
+alerts_app = typer.Typer(help="Récepteur d'alertes.", no_args_is_help=True)
 app.add_typer(data_app, name="data")
+app.add_typer(pipeline_app, name="pipeline")
 app.add_typer(registry_app, name="registry")
 app.add_typer(db_app, name="db")
+app.add_typer(alerts_app, name="alerts")
+
+logger = logging.getLogger(__name__)
 
 
 @app.callback()
@@ -120,6 +127,57 @@ def make_registry():
     return ModelRegistry(client, settings.model_name, settings.model_alias)
 
 
+def make_ops_store():
+    from bikeshare.db.ops import OpsStore
+
+    url = get_settings().ops_database_url
+    return OpsStore(url.get_secret_value() if url else None)
+
+
+@pipeline_app.command("run")
+def pipeline_run() -> None:
+    """Exécute un cycle d'entraînement tout de suite."""
+    from bikeshare.pipeline.flow import training_pipeline
+
+    typer.echo(json.dumps(training_pipeline(), default=str))
+
+
+@pipeline_app.command("serve")
+def pipeline_serve() -> None:
+    """Sert le déploiement planifié (processus bloquant)."""
+    from bikeshare.pipeline.serve import serve
+
+    serve()
+
+
+@pipeline_app.command("setup-alerts")
+def pipeline_setup_alerts() -> None:
+    """Crée ou met à jour l'alerte Prefect sur les échecs du flow."""
+    from bikeshare.pipeline.alerting import setup_alerts
+
+    typer.echo(f"automation {setup_alerts(get_settings().alert_sink_url)}")
+
+
+@pipeline_app.command("start")
+def pipeline_start() -> None:
+    """Point d'entrée du conteneur : alertes, premier entraînement, puis planification."""
+    from bikeshare.pipeline.alerting import setup_alerts
+    from bikeshare.pipeline.flow import training_pipeline
+    from bikeshare.pipeline.serve import serve
+
+    try:
+        setup_alerts(get_settings().alert_sink_url)
+    except Exception:
+        logger.exception("alerte Prefect non configurée")
+    if make_registry().champion() is None:
+        try:
+            training_pipeline()
+        except Exception:
+            # l'échec est déjà tracé et alerté, le planning prendra le relais
+            logger.exception("premier entraînement en échec")
+    serve()
+
+
 @registry_app.command("status")
 def registry_status() -> None:
     """Liste les versions du modèle, leur statut et leurs alias."""
@@ -152,6 +210,7 @@ def registry_promote(
     except PromotionRefusedError as e:
         typer.echo(f"refusé : {e}", err=True)
         raise typer.Exit(1) from e
+    make_ops_store().alias_changed(change)
     typer.echo(f"champion : v{change.from_version} -> v{change.to_version}")
 
 
@@ -169,6 +228,7 @@ def registry_rollback(
     except PromotionRefusedError as e:
         typer.echo(f"refusé : {e}", err=True)
         raise typer.Exit(1) from e
+    make_ops_store().alias_changed(change)
     typer.echo(f"champion : v{change.from_version} -> v{change.to_version}")
 
 
@@ -197,3 +257,18 @@ def db_init() -> None:
         },
     )
     typer.echo("base initialisée")
+
+
+@alerts_app.command("serve")
+def alerts_serve() -> None:
+    """Lance le récepteur d'alertes."""
+    import uvicorn
+
+    settings = get_settings()
+    uvicorn.run(
+        "bikeshare.alerts:create_app",
+        factory=True,
+        host=settings.api_host,
+        port=settings.alert_sink_port,
+        access_log=False,
+    )
