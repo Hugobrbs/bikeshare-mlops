@@ -1,0 +1,89 @@
+from fastapi.testclient import TestClient
+
+from tests.unit.api.conftest import FakeModelStore, FakeRepository
+
+
+def test_live(client: TestClient) -> None:
+    assert client.get("/health/live").json()["status"] == "ok"
+
+
+def test_ready(client: TestClient) -> None:
+    response = client.get("/health/ready")
+
+    assert response.status_code == 200
+    assert response.json()["model_loaded"] is True
+    assert response.json()["database"] is True
+
+
+def test_not_ready_without_model(client: TestClient, models: FakeModelStore) -> None:
+    models.current = None
+    models.last_error = "alias champion introuvable"
+
+    response = client.get("/health/ready")
+
+    assert response.status_code == 503
+    assert response.json()["status"] == "unavailable"
+    assert response.json()["detail"] == "alias champion introuvable"
+
+
+def test_not_ready_without_database(client: TestClient, repository: FakeRepository) -> None:
+    repository.available = False
+
+    assert client.get("/health/ready").status_code == 503
+
+
+def test_registry_down_does_not_stop_serving(client: TestClient, models: FakeModelStore) -> None:
+    models.last_error = "MLflow injoignable"
+
+    response = client.get("/health/ready")
+
+    assert response.status_code == 200
+    assert response.json()["registry_reachable"] is False
+
+
+def test_health_checks_are_not_traced(client: TestClient, repository: FakeRepository) -> None:
+    client.get("/health/live")
+    client.get("/health/ready")
+    client.get("/model")
+
+    assert repository.requests == []
+
+
+def test_served_model(client: TestClient) -> None:
+    body = client.get("/model").json()
+
+    assert body["version"] == 3
+    assert body["alias"] == "champion"
+    assert body["feature_version"] == "1"
+
+
+def test_refresh_needs_the_admin_token(client: TestClient, models: FakeModelStore) -> None:
+    assert client.post("/admin/model/refresh").status_code == 401
+    wrong = client.post("/admin/model/refresh", headers={"X-Admin-Token": "faux"})
+    assert wrong.status_code == 401
+    assert models.refreshes == 1  # seulement celui du démarrage
+
+
+def test_refresh(client: TestClient, models: FakeModelStore) -> None:
+    response = client.post("/admin/model/refresh", headers={"X-Admin-Token": "jeton-de-test"})
+
+    assert response.status_code == 200
+    assert response.json()["version"] == 3
+    assert models.refreshes == 2
+
+
+def test_refresh_when_registry_is_down(client: TestClient, models: FakeModelStore) -> None:
+    models.last_error = "MLflow injoignable"
+
+    response = client.post("/admin/model/refresh", headers={"X-Admin-Token": "jeton-de-test"})
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "registry_unavailable"
+
+
+def test_openapi_documents_the_contract(client: TestClient) -> None:
+    schema = client.get("/openapi.json").json()
+
+    assert {"/predict", "/predict/batch", "/feedback", "/health/ready"} <= set(schema["paths"])
+    assert "example" in schema["components"]["schemas"]["Observation"]
+    assert client.get("/docs").status_code == 200
