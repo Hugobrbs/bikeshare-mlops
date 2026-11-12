@@ -21,6 +21,8 @@ class FakeRepository:
 
     def __init__(self) -> None:
         self.available = True
+        # erreur SQL qui n'est pas une panne (donnée refusée, contrainte violée)
+        self.rejects_writes_with: Exception | None = None
         self.requests: list[RequestTrace] = []
         self.predictions: dict[UUID, PredictionRow] = {}
         self.feedbacks: dict[UUID, FeedbackRow] = {}
@@ -44,6 +46,8 @@ class FakeRepository:
 
     def save_predictions(self, trace: RequestTrace, model_id: UUID, rows: list) -> None:
         self._check()
+        if self.rejects_writes_with:
+            raise self.rejects_writes_with
         self.requests.append(trace)
         self.predictions.update({row.prediction_id: row for row in rows})
 

@@ -1,5 +1,6 @@
 from uuid import UUID
 
+import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
@@ -148,6 +149,19 @@ def test_invalid_input_while_database_is_down(
 
     assert response.status_code == 422
     assert response.json()["request_id"] in caplog.text
+
+
+def test_sql_error_that_is_not_an_outage_is_a_traced_500(
+    client: TestClient, repository: FakeRepository, observation: dict
+) -> None:
+    repository.rejects_writes_with = psycopg.errors.NumericValueOutOfRange("valeur refusée")
+
+    response = client.post("/predict", json={"observation": observation})
+
+    # ni 503 (la base répond), ni perdu : le client ne doit pas réessayer en boucle
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "internal_error"
+    assert repository.requests[-1].error_code == "internal_error"
 
 
 def test_unexpected_error_does_not_leak_details(

@@ -64,6 +64,12 @@ def test_refresh_needs_the_admin_token(client: TestClient, models: FakeModelStor
     assert models.refreshes == 1  # seulement celui du démarrage
 
 
+def test_non_ascii_token_is_refused_not_a_crash(client: TestClient) -> None:
+    response = client.post("/admin/model/refresh", headers={"X-Admin-Token": "é".encode()})
+
+    assert response.status_code == 401
+
+
 def test_refresh(client: TestClient, models: FakeModelStore) -> None:
     response = client.post("/admin/model/refresh", headers={"X-Admin-Token": "jeton-de-test"})
 

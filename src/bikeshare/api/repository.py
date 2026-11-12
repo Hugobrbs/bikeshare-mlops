@@ -75,7 +75,7 @@ class TraceRepository:
 
     def __init__(self, url: str, min_size: int = 1, max_size: int = 5) -> None:
         self.pool = ConnectionPool(
-            url, min_size=min_size, max_size=max_size, open=False, timeout=3, name="api"
+            url, min_size=min_size, max_size=max_size, open=False, timeout=1, name="api"
         )
 
     def open(self) -> None:
@@ -87,7 +87,7 @@ class TraceRepository:
 
     def ping(self) -> bool:
         try:
-            with self.pool.connection(timeout=2) as conn:
+            with self.pool.connection(timeout=1) as conn:
                 conn.execute("SELECT 1")
             return True
         except (psycopg.Error, TimeoutError):

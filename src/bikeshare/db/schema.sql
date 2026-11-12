@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS ops.pipeline_runs (
     started_at timestamptz NOT NULL,
     ended_at timestamptz,
     status text NOT NULL CHECK (status IN ('running', 'completed', 'failed')),
-    -- promoted, champion_kept, rejected, no_new_data, invalid_data, error
+    -- promoted, champion_kept, rejected, no_new_data, invalid_data, error, crashed
     outcome text,
     batch_ids text[] NOT NULL DEFAULT '{}',
     mlflow_run_id text,
