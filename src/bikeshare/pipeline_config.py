@@ -29,10 +29,26 @@ class ValidationConfig(Section):
     min_temperature_std: float = Field(default=0.02, ge=0)
 
 
+class ModelConfig(Section):
+    max_iter: int = Field(default=300, ge=1)
+    learning_rate: float = Field(default=0.08, gt=0)
+    max_leaf_nodes: int = Field(default=31, ge=2)
+    min_samples_leaf: int = Field(default=20, ge=1)
+    l2_regularization: float = Field(default=0.0, ge=0)
+
+
+class TrainingConfig(Section):
+    seed: int = 42
+    window_months: int = Field(default=12, ge=1)
+    test_days: int = Field(default=7, ge=1)
+    model: ModelConfig = ModelConfig()
+
+
 class PipelineConfig(Section):
     dataset: DatasetConfig
     replay: ReplayConfig = ReplayConfig()
     validation: ValidationConfig = ValidationConfig()
+    training: TrainingConfig = TrainingConfig()
 
 
 def load_pipeline_config(path: Path) -> PipelineConfig:

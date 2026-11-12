@@ -22,3 +22,16 @@ validation:
   mean_rentals_max: 1500
   # une température qui ne varie pas sur un mois = capteur figé
   min_temperature_std: 0.02
+
+training:
+  seed: 42
+  # entraînement sur les 12 derniers mois acceptés
+  window_months: 12
+  # les 7 derniers jours de la fenêtre servent de jeu de test
+  test_days: 7
+  model:
+    max_iter: 300
+    learning_rate: 0.08
+    max_leaf_nodes: 31
+    min_samples_leaf: 20
+    l2_regularization: 0.0
