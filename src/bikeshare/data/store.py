@@ -34,6 +34,7 @@ class BatchStore:
         self.incoming_dir = data_dir / "incoming"
         self.curated_dir = data_dir / "curated"
         self.quarantine_dir = data_dir / "quarantine"
+        self.reports_dir = data_dir / "reports"
         self.manifest_path = self.curated_dir / "manifest.json"
 
     def pending(self) -> list[Path]:
@@ -85,6 +86,11 @@ class BatchStore:
             json.dumps(report, indent=2, ensure_ascii=False, default=str)
         )
         return target
+
+    def save_report(self, report: dict) -> Path:
+        path = self.reports_dir / f"{report['batch_id']}.json"
+        write_atomic(path, json.dumps(report, indent=2, ensure_ascii=False, default=str).encode())
+        return path
 
     def load(self, last: int | None = None) -> pd.DataFrame:
         """Concatène les lots acceptés (les `last` plus récents si précisé)."""
