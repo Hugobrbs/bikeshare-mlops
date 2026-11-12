@@ -134,6 +134,22 @@ def read_aggregate(csv_prefix: Path) -> dict:
     return next(row for row in rows if row["Name"] == "Aggregated")
 
 
+def percentile(stats: dict, name: str) -> int | None:
+    # Locust écrit "N/A" quand aucune requête n'a abouti
+    return int(stats[name]) if stats[name].isdigit() else None
+
+
+def append_row(path: Path, row: dict) -> None:
+    """Ecrit chaque tir dès qu'il est terminé : une erreur en cours de campagne ne perd
+    pas les mesures déjà faites, et on peut lancer une configuration à la fois."""
+    is_new = not path.exists()
+    with path.open("a", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(row))
+        if is_new:
+            writer.writeheader()
+        writer.writerow(row)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--name", required=True, help="nom du dossier de résultats")
@@ -148,7 +164,6 @@ def main() -> None:
     out = ROOT / "loadtests" / "results" / args.name
     raw = out / "raw"
     raw.mkdir(parents=True, exist_ok=True)
-    summary = []
 
     for config in (c for c in CONFIGS if c["name"] in args.configs):
         start_api(config)
@@ -172,26 +187,17 @@ def main() -> None:
                     "requests": requests,
                     "rps": round(float(stats["Requests/s"]), 1),
                     "failure_pct": round(100 * failures / max(requests, 1), 2),
-                    "p50_ms": int(stats["50%"]),
-                    "p95_ms": int(stats["95%"]),
-                    "p99_ms": int(stats["99%"]),
+                    "p50_ms": percentile(stats, "50%"),
+                    "p95_ms": percentile(stats, "95%"),
+                    "p99_ms": percentile(stats, "99%"),
                     "cpu_mean_pct": round(cpu_mean),
                     "cpu_max_pct": round(cpu_max),
                     "memory_max_mb": round(memory_max),
                     "campaign_id": campaign,
                 }
-                summary.append(row)
+                append_row(out / "summary.csv", row)
                 print(row, flush=True)
                 time.sleep(3)
-
-    # ajout au fichier existant : la campagne peut être lancée une configuration à la fois
-    path = out / "summary.csv"
-    is_new = not path.exists()
-    with path.open("a", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=list(summary[0]))
-        if is_new:
-            writer.writeheader()
-        writer.writerows(summary)
 
 
 if __name__ == "__main__":
