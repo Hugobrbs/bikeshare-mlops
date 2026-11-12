@@ -12,3 +12,13 @@ dataset:
 replay:
   # nombre de mois livrés d'un coup au premier lancement
   bootstrap_batches: 6
+
+validation:
+  # part minimale des heures du mois présentes dans le lot (le pire mois réel est à 92,5 %)
+  min_hour_coverage: 0.90
+  max_missing_days: 1
+  max_rentals: 5000
+  mean_rentals_min: 5
+  mean_rentals_max: 1500
+  # une température qui ne varie pas sur un mois = capteur figé
+  min_temperature_std: 0.02
