@@ -9,6 +9,9 @@ from bikeshare.pipeline.flow import FLOW_NAME
 BLOCK_NAME = "bikeshare-alert-sink"
 AUTOMATION_NAME = "bikeshare-flow-failure"
 
+# changer ce texte (par exemple le numéro) fait recréer l'automation au prochain démarrage
+DESCRIPTION = "Alerte quand le pipeline d'entraînement échoue ou plante (v1)"
+
 SUBJECT = "Pipeline {{ flow.name }} : {{ flow_run.state.name }}"
 BODY = """Flow run : {{ flow_run.name }} ({{ flow_run.id }})
 Etat : {{ flow_run.state.name }}
@@ -36,7 +39,7 @@ def setup_alerts(sink_url: str) -> str:
 
     automation = Automation(
         name=AUTOMATION_NAME,
-        description="Alerte quand le pipeline d'entraînement échoue ou plante",
+        description=DESCRIPTION,
         trigger=EventTrigger(
             expect={
                 "prefect.flow-run.Failed",
@@ -54,8 +57,11 @@ def setup_alerts(sink_url: str) -> str:
     try:
         existing = Automation.read(name=AUTOMATION_NAME)
     except (ObjectNotFound, ValueError):
-        return str(automation.create().id)
-    # on met à jour l'existante pour ne pas en empiler une par démarrage
-    automation.id = existing.id
-    automation.update()
-    return str(existing.id)
+        existing = None
+    if existing is not None:
+        if existing.description == DESCRIPTION:
+            return str(existing.id)
+        # définition modifiée : on recrée plutôt que de mettre à jour, une automation
+        # mise à jour ne se déclenche plus (constaté avec prefect 3.8.8)
+        existing.delete()
+    return str(automation.create().id)
