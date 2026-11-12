@@ -1,0 +1,41 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# --- Configuration locale et secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Données : jamais versionnées, reconstruites par `make data` ---
+data/source/
+data/incoming/
+data/curated/
+data/quarantine/
+data/reports/
+data/cache/
+
+# --- Artefacts d'exécution ---
+mlruns/
+mlartifacts/
+*.db
+*.sqlite*
+*.joblib
+gx/
+
+# --- Tests de charge : seuls les résumés sont versionnés ---
+loadtests/results/**/raw/
+
+# --- Outils ---
+.idea/
+.vscode/
+.DS_Store
