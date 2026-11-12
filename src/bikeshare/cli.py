@@ -165,13 +165,23 @@ def pipeline_start() -> None:
     """Point d'entrée du conteneur : alertes, premier entraînement, puis planification."""
     from bikeshare.pipeline.alerting import setup_alerts
     from bikeshare.pipeline.flow import training_pipeline
+    from bikeshare.pipeline.recovery import mark_orphaned_runs
     from bikeshare.pipeline.serve import serve
 
     try:
         setup_alerts(get_settings().alert_sink_url)
+        orphans = mark_orphaned_runs(make_ops_store())
+        if orphans:
+            logger.warning("runs interrompus passés en Crashed : %s", orphans)
     except Exception:
-        logger.exception("alerte Prefect non configurée")
-    if make_registry().champion() is None:
+        logger.exception("alertes ou reprise non configurées")
+    try:
+        first_run = make_registry().champion() is None
+    except Exception:
+        # mlflow injoignable : on sert quand même le planning, les runs alerteront
+        logger.exception("registre de modèles injoignable au démarrage")
+        first_run = False
+    if first_run:
         try:
             training_pipeline()
         except Exception:
