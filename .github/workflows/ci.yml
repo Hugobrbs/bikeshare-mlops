@@ -39,7 +39,9 @@ jobs:
       - name: Installer les dépendances verrouillées
         run: uv sync --locked --all-extras --all-groups
       - name: Tests et couverture
-        run: uv run --no-sync pytest -m "not integration" --cov --cov-report=term --cov-report=xml
+        run: >-
+          uv run --no-sync pytest -m "not integration"
+          --cov --cov-report=term --cov-report=xml --cov-fail-under=80
       - uses: actions/upload-artifact@v7
         with:
           name: coverage-unit
@@ -72,6 +74,19 @@ jobs:
         run: uv sync --locked --all-extras --all-groups
       - name: PostgreSQL réel et moteur Prefect
         run: uv run --no-sync pytest -m integration
+
+  audit:
+    name: Audit des dépendances
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          enable-cache: true
+      - name: Installer les dépendances verrouillées
+        run: uv sync --locked --all-extras --all-groups
+      - name: Vulnérabilités connues
+        run: make audit
 
   docker:
     name: Images Docker
