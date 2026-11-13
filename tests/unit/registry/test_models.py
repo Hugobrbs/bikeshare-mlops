@@ -72,8 +72,23 @@ def test_rollback_restores_previous_champion(registry: ModelRegistry) -> None:
     assert str(registry.champion().version) == v1
     assert change.action == "rollback"
     assert (change.from_version, change.to_version) == (v2, v1)
-    # un second rollback annule le premier
-    assert registry.rollback(actor="hugo", reason="fausse alerte").to_version == v2
+
+
+def test_version_left_by_a_rollback_cannot_come_back_by_mistake(registry: ModelRegistry) -> None:
+    v1, v2 = add_version(registry), add_version(registry)
+    registry.promote(v1, actor="pipeline", reason="v1")
+    registry.promote(v2, actor="pipeline", reason="v2")
+    registry.rollback(actor="hugo", reason="régression en production")
+
+    # relancer la commande ne doit pas remettre v2 en service
+    with pytest.raises(PromotionRefusedError, match="aucune version précédente"):
+        registry.rollback(actor="hugo", reason="double clic")
+    with pytest.raises(PromotionRefusedError, match="non servable"):
+        registry.promote(v2, actor="hugo", reason="essai")
+
+    assert str(registry.champion().version) == v1
+    tags = registry.client.get_model_version(NAME, v2).tags
+    assert tags["validation_status"] == "rolled_back"
 
 
 def test_rollback_to_explicit_version(registry: ModelRegistry) -> None:
@@ -84,6 +99,7 @@ def test_rollback_to_explicit_version(registry: ModelRegistry) -> None:
     registry.rollback(actor="hugo", reason="retour à v1", to_version=v1)
 
     assert str(registry.champion().version) == v1
+    assert registry.version_by_alias(PREVIOUS_ALIAS) is None
 
 
 def test_rollback_refusals(registry: ModelRegistry) -> None:

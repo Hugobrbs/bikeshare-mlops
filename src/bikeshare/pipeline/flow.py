@@ -13,7 +13,7 @@ from bikeshare.data.acquisition import AcquisitionError, fetch_source
 from bikeshare.data.ingestion import ingest_pending
 from bikeshare.data.replay import publish_batches
 from bikeshare.data.store import BatchRecord, BatchStore
-from bikeshare.data.validation import DataValidationError
+from bikeshare.data.validation import DataValidationError, following_month
 from bikeshare.db.ops import OpsStore
 from bikeshare.evaluation import evaluate
 from bikeshare.features import FEATURE_VERSION
@@ -27,7 +27,12 @@ from bikeshare.registry.tracking import (
     load_model,
     reload_delta,
 )
-from bikeshare.reporting import forecast_figure, importance_figure, input_importance
+from bikeshare.reporting import (
+    close_figure,
+    forecast_figure,
+    importance_figure,
+    input_importance,
+)
 from bikeshare.settings import Settings, get_settings
 from bikeshare.training import Split, TrainingResult, temporal_split, train
 
@@ -61,8 +66,12 @@ def acquire(config: PipelineConfig, store: BatchStore) -> list[str]:
     """Récupère la source puis, si rien n'attend déjà, le ou les prochains lots."""
     logger = get_run_logger()
     snapshot = fetch_source(config.dataset, store.source_dir)
-    if not store.pending():
-        count = 1 if store.accepted() else config.replay.bootstrap_batches
+    pending, accepted = store.pending(), store.accepted()
+    # un lot rejeté laisse un trou : on le relivre avant de toucher aux lots suivants déjà
+    # en attente, sinon ils seraient rejetés à leur tour pour rupture de continuité
+    gap = bool(accepted and pending and pending[0].stem != following_month(accepted[-1].batch_id))
+    if not pending or gap:
+        count = 1 if accepted else config.replay.bootstrap_batches
         publish_batches(
             snapshot.path, store.incoming_dir, delivered=store.delivered_ids(), count=count
         )
@@ -167,8 +176,14 @@ def publish(
 
     importance = input_importance(result.model, split.test, seed)
     run.log_json(importance, "evaluation/importance.json")
-    run.log_figure(importance_figure(importance), "evaluation/importance.png")
-    run.log_figure(forecast_figure(result.model, split.test), "evaluation/previsions.png")
+    figures = {
+        "evaluation/importance.png": importance_figure(importance),
+        "evaluation/previsions.png": forecast_figure(result.model, split.test),
+    }
+    for path, figure in figures.items():
+        run.log_figure(figure, path)
+        # le processus vit longtemps : sans ça les figures s'accumulent en mémoire
+        close_figure(figure)
 
     version = run.log_model(
         result.model, split.test, model_name, {"feature_version": FEATURE_VERSION}
@@ -253,7 +268,12 @@ def run_steps(
         f"train-{batch_ids[-1]}",
         {
             "flow_run_id": flow_run_id,
+            # batch_ids : lots arrivés pendant ce run. training_batches : toute la fenêtre
+            # d'entraînement, qui contient aussi des lots acceptés lors de runs précédents
             "batch_ids": ",".join(batch_ids),
+            "training_batches": ",".join(
+                r.batch_id for r in store.accepted()[-training.window_months :]
+            ),
             "data_fingerprint": store.fingerprint(last=training.window_months),
             "git_commit": settings.app_revision,
             "feature_version": FEATURE_VERSION,

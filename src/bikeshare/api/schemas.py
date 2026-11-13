@@ -93,11 +93,14 @@ class FeedbackRequest(BaseModel):
     )
     prediction_id: UUID
     useful: bool | None = Field(default=None, description="Avis subjectif sur la prédiction.")
+    # bornes alignées sur ce que la base accepte (colonne integer, pas de caractère nul)
     observed_rentals: int | None = Field(
-        default=None, ge=0, description="Nombre de locations réellement constaté."
+        default=None, ge=0, le=100_000, description="Nombre de locations réellement constaté."
     )
     observed_at: AwareDatetime | None = None
-    label_source: str | None = Field(default=None, min_length=1, max_length=64)
+    label_source: str | None = Field(
+        default=None, min_length=1, max_length=64, pattern=r"^[^\x00]+$"
+    )
 
     @model_validator(mode="after")
     def check_consistency(self) -> "FeedbackRequest":

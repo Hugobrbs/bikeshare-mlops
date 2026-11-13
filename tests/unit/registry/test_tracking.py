@@ -65,10 +65,12 @@ def test_publishing_twice_keeps_a_single_version(
     model = train(domain_frame, TrainingConfig(model=ModelConfig(max_iter=20))).model
 
     first = run.log_model(model, domain_frame.head(50), NAME)
-    second = run.log_model(model, domain_frame.head(50), NAME)
+    # la relance suit un échec survenu avant la pose des tags : ils doivent l'être cette fois
+    second = run.log_model(model, domain_frame.head(50), NAME, {"feature_version": "1"})
 
     assert second == first
     assert len(client.search_model_versions(f"name='{NAME}'")) == 1
+    assert client.get_model_version(NAME, first.version).tags == {"feature_version": "1"}
 
 
 def test_failed_run_is_marked_failed(run: TrainingRun, client: MlflowClient) -> None:

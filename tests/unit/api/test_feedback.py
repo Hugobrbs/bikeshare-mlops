@@ -96,10 +96,21 @@ def test_unknown_prediction(client: TestClient, repository: FakeRepository) -> N
         {"label_source": None},
         {"observed_at": None},
         {"observed_rentals": -3},
+        {"observed_rentals": 3_000_000_000},
+        {"label_source": "a\x00b"},
         {"observed_at": "2012-06-15T09:05:00"},
         {"feedback_id": "pas-un-uuid"},
     ],
-    ids=["vide", "sans-source", "sans-date", "negatif", "date-sans-fuseau", "id-invalide"],
+    ids=[
+        "vide",
+        "sans-source",
+        "sans-date",
+        "negatif",
+        "trop-grand-pour-la-base",
+        "caractere-nul",
+        "date-sans-fuseau",
+        "id-invalide",
+    ],
 )
 def test_invalid_feedback(client: TestClient, prediction_id: str, overrides: dict) -> None:
     response = client.post("/feedback", json=observed(prediction_id, **overrides))

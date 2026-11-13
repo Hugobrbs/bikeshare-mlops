@@ -21,8 +21,12 @@ def forward(url: str, alert: Alert, transport: httpx.BaseTransport | None = None
         with httpx.Client(timeout=10, transport=transport) as client:
             response = client.post(url, json={"text": f"{alert.subject}\n{alert.body}"})
             response.raise_for_status()
+    # le message d'erreur de httpx contient l'URL du webhook, qui est un secret
+    except httpx.HTTPStatusError as e:
+        logger.warning("alerte non relayée : HTTP %s", e.response.status_code)
+        return False
     except httpx.HTTPError as e:
-        logger.warning("alerte non relayée : %s", e)
+        logger.warning("alerte non relayée : %s", type(e).__name__)
         return False
     return True
 

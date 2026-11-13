@@ -14,7 +14,6 @@ import psycopg
 from fastapi import Depends, FastAPI, Header, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from psycopg_pool import PoolTimeout
 from starlette.concurrency import run_in_threadpool
 
 from bikeshare import __version__
@@ -43,7 +42,9 @@ from bikeshare.settings import Settings, get_settings
 logger = logging.getLogger(__name__)
 
 TRACED_ENDPOINTS = {"/predict", "/predict/batch", "/feedback"}
-STORAGE_ERRORS = (psycopg.Error, PoolTimeout)
+# base injoignable ou pool épuisé. Les autres erreurs SQL (donnée refusée, contrainte)
+# ne sont pas des pannes : elles remontent en 500 et sont tracées comme telles
+STORAGE_ERRORS = (psycopg.OperationalError,)
 
 DESCRIPTION = """
 Prévision du nombre de locations de vélos pour une heure donnée, à partir de la date et de la météo.
@@ -369,8 +370,9 @@ def create_app(
         tard après `MODEL_REFRESH_SECONDS`.
         """
         expected = service.settings.admin_token
+        # en octets : compare_digest refuse les chaînes non ASCII
         if expected is None or not secrets.compare_digest(
-            x_admin_token or "", expected.get_secret_value()
+            (x_admin_token or "").encode(), expected.get_secret_value().encode()
         ):
             raise ApiError(401, "unauthorized", "Jeton d'administration absent ou invalide.")
         try:
@@ -379,8 +381,10 @@ def create_app(
             raise ApiError(503, "registry_unavailable", "Registre de modèles injoignable.") from e
         return served_model(service)
 
+    # async : cette sonde ne passe pas par le pool de threads, elle répond même quand
+    # tous les threads attendent une base en panne
     @app.get("/health/live", response_model=Health, tags=["Santé"])
-    def live() -> Health:
+    async def live() -> Health:
         """Le processus répond."""
         return Health(status="ok")
 

@@ -87,9 +87,17 @@ class ModelRegistry:
         version = str(version)
         current = self.champion()
         current_version = str(current.version) if current else None
-        if current_version and current_version != version:
-            self.client.set_registered_model_alias(self.name, PREVIOUS_ALIAS, current_version)
         self.client.set_registered_model_alias(self.name, self.alias, version)
+        if action == "rollback":
+            # la version qu'on quitte n'est plus servable : sans ça, relancer le rollback
+            # par erreur la remettrait en service
+            self.client.set_model_version_tag(
+                self.name, current_version, "validation_status", "rolled_back"
+            )
+            if self.version_by_alias(PREVIOUS_ALIAS) is not None:
+                self.client.delete_registered_model_alias(self.name, PREVIOUS_ALIAS)
+        elif current_version and current_version != version:
+            self.client.set_registered_model_alias(self.name, PREVIOUS_ALIAS, current_version)
         now = datetime.now(UTC).isoformat(timespec="seconds")
         for key, value in {
             "promoted_at": now,

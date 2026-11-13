@@ -110,3 +110,49 @@ def test_every_validated_batch_is_reported(store: BatchStore, source_file: Path)
         ("2011-01", True),
         ("2011-02", False),
     ]
+
+
+def test_misnamed_file_is_quarantined_instead_of_blocking(
+    store: BatchStore, source_file: Path
+) -> None:
+    deliver(store, source_file)
+    (store.incoming_dir / "2011-01.csv").rename(store.incoming_dir / "export.csv")
+
+    with pytest.raises(DataValidationError, match="validation_crashed"):
+        ingest_pending(store, RULES)
+
+    assert store.pending() == []
+    assert len(list(store.quarantine_dir.glob("export-*.csv"))) == 1
+
+
+def test_wrong_type_is_quarantined_instead_of_blocking(
+    store: BatchStore, source_file: Path
+) -> None:
+    deliver(store, source_file)
+    incoming = store.incoming_dir / "2011-01.csv"
+    lines = incoming.read_text().splitlines()
+    header = lines[0].split(",")
+    row = lines[1].split(",")
+    row[header.index("registered")] = "12a"
+    incoming.write_text("\n".join([lines[0], ",".join(row), *lines[2:]]) + "\n")
+
+    with pytest.raises(DataValidationError):
+        ingest_pending(store, RULES)
+
+    assert store.pending() == []
+    assert store.accepted() == []
+
+
+def test_accepted_batch_redelivered_with_other_content_is_quarantined(
+    store: BatchStore, source_file: Path
+) -> None:
+    deliver(store, source_file)
+    content = (store.incoming_dir / "2011-01.csv").read_text()
+    ingest_pending(store, RULES)
+    (store.incoming_dir / "2011-01.csv").write_text(content.replace("2011-01-01", "2011-01-02", 1))
+
+    with pytest.raises(DataValidationError, match="validation_crashed"):
+        ingest_pending(store, RULES)
+
+    assert store.pending() == []
+    assert [r.batch_id for r in store.accepted()] == ["2011-01"]

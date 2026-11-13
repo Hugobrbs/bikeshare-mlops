@@ -46,16 +46,20 @@ def test_alert_is_forwarded_when_a_webhook_is_configured() -> None:
     assert ops.alerts[0][2] is True
 
 
-def test_forward_failure_does_not_lose_the_alert() -> None:
+def test_forward_failure_does_not_lose_the_alert(caplog: pytest.LogCaptureFixture) -> None:
     ops = FakeOps()
 
     def broken(request: httpx.Request) -> httpx.Response:
         return httpx.Response(500)
 
-    response = make_client(ops, broken, "https://hooks.test/alertes").post("/alerts", json=ALERT)
+    client = make_client(ops, broken, "https://hooks.test/services/JETON-SECRET")
+    response = client.post("/alerts", json=ALERT)
 
     assert response.status_code == 202
     assert ops.alerts == [(ALERT["subject"], ALERT["body"], False)]
+    # l'URL du webhook est un secret : elle ne doit pas finir dans les logs
+    assert "HTTP 500" in caplog.text
+    assert "JETON-SECRET" not in caplog.text
 
 
 @pytest.mark.parametrize("payload", [{}, {"subject": "sans corps"}])
