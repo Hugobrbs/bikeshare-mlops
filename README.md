@@ -4,7 +4,7 @@ Chaîne MLOps complète pour prévoir, heure par heure, le nombre de locations d
 service de vélos en libre-service (jeu de données
 [UCI Bike Sharing](https://archive.ics.uci.edu/dataset/275/bike+sharing+dataset)).
 
-Projet final du module **5MLDE — Déploiement de modèles** (SUPINFO).
+Projet final du module **5MLDE - Déploiement de modèles** (SUPINFO).
 
 > Dépôt en cours de construction : la documentation complète (architecture,
 > installation, commandes de reproduction) arrive avec les briques du projet.

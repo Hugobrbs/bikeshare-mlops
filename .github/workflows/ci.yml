@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          enable-cache: true
+      - name: Installer les dépendances verrouillées
+        run: uv sync --locked --all-extras --all-groups
+      - name: Erreurs statiques
+        run: uv run --no-sync ruff check --output-format=github .
+      - name: Formatage
+        run: uv run --no-sync ruff format --check .
+
+  tests:
+    name: Tests unitaires
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          enable-cache: true
+      - name: Installer les dépendances verrouillées
+        run: uv sync --locked --all-extras --all-groups
+      - name: Tests et couverture
+        run: uv run --no-sync pytest -m "not integration" --cov --cov-report=term --cov-report=xml
+      - uses: actions/upload-artifact@v7
+        with:
+          name: coverage-unit
+          path: coverage.xml
