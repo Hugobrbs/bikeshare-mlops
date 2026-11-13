@@ -5,6 +5,7 @@ import psycopg
 import pytest
 from prefect.testing.utilities import prefect_test_harness
 
+from bikeshare.api.repository import TraceRepository
 from bikeshare.db.migrate import init_database
 
 ADMIN_URL = os.environ.get("TEST_ADMIN_DATABASE_URL")
@@ -53,3 +54,11 @@ def prefect_server() -> Iterator[None]:
     """Serveur Prefect temporaire : les flows tournent avec le vrai moteur d'orchestration."""
     with prefect_test_harness():
         yield
+
+
+@pytest.fixture
+def repository(admin: psycopg.Connection) -> Iterator[TraceRepository]:
+    repo = TraceRepository(url_for("api_writer"), min_size=1, max_size=4)
+    repo.pool.open(wait=True)
+    yield repo
+    repo.close()

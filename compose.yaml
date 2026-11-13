@@ -142,6 +142,42 @@ services:
       alert-sink:
         condition: service_started
 
+  api:
+    <<: *api-image
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      API_HOST: 0.0.0.0
+      API_WORKERS: ${API_WORKERS:-1}
+      # une prédiction = une ligne : les threads OpenMP de scikit-learn ne font que se gêner
+      # entre workers (mesuré : débit divisé par deux à 2 CPU sans cette limite)
+      OMP_NUM_THREADS: ${API_OMP_THREADS:-1}
+      API_DATABASE_URL: postgresql://api_writer:${API_DB_PASSWORD:-bikeshare-local-api}@postgres:5432/bikeshare
+      API_DB_POOL_MAX: ${API_DB_POOL_MAX:-5}
+      MODEL_REFRESH_SECONDS: ${MODEL_REFRESH_SECONDS:-30}
+      # si mlflow est arrêté, on abandonne vite au lieu de réessayer pendant des minutes
+      MLFLOW_HTTP_REQUEST_MAX_RETRIES: "1"
+      MLFLOW_HTTP_REQUEST_TIMEOUT: "10"
+      HEARTBEAT_SECONDS: ${HEARTBEAT_SECONDS:-15}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-bikeshare-local-admin-token}
+    ports:
+      - "127.0.0.1:${API_PORT:-8001}:8001"
+    deploy:
+      resources:
+        limits:
+          cpus: ${API_CPUS:-1.0}
+          memory: ${API_MEMORY:-768M}
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      mlflow:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health/live', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
 volumes:
   postgres_data:
   mlflow_data:
