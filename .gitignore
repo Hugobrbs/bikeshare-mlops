@@ -31,3 +31,7 @@ mlartifacts/
 .idea/
 .vscode/
 .DS_Store
+
+# tests de charge : on versionne la synthèse et les stats agrégées de chaque tir, pas le reste
+loadtests/results/*/raw/*
+!loadtests/results/*/raw/*_stats.csv
