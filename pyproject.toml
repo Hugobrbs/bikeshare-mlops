@@ -64,7 +64,8 @@ src = ["src", "tests", "loadtests"]
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "C4", "PT", "N", "RUF"]
 # RUF001-003 : faux positifs sur les accents et apostrophes du français
-ignore = ["RUF001", "RUF002", "RUF003"]
+# N803, N806 : X en majuscule, comme dans scikit-learn
+ignore = ["RUF001", "RUF002", "RUF003", "N803", "N806"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["bikeshare"]
