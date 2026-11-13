@@ -1,0 +1,14 @@
+dataset:
+  name: uci-bike-sharing
+  member: hour.csv
+  # sha256 du fichier extrait (pas du zip) : reste valable quel que soit le miroir
+  member_sha256: e03de4ee4ef4dc376ac6e04bf829673c6269e8eba5c60fa121640fa2f829504f
+  # essayées dans l'ordre
+  urls:
+    - https://archive.ics.uci.edu/static/public/275/bike+sharing+dataset.zip
+    - https://archive.ics.uci.edu/ml/machine-learning-databases/00275/Bike-Sharing-Dataset.zip
+  timeout_seconds: 30
+
+replay:
+  # nombre de mois livrés d'un coup au premier lancement
+  bootstrap_batches: 6
