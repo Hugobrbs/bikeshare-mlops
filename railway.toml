@@ -1,4 +1,3 @@
-# Déploiement de l'API seule sur Railway (les autres services restent locaux).
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"

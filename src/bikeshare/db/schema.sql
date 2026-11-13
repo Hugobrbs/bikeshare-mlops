@@ -1,9 +1,6 @@
--- Rejouable : tout est en IF NOT EXISTS. Les rôles sont créés avant par db/migrate.py.
-
 CREATE SCHEMA IF NOT EXISTS tracing;
 CREATE SCHEMA IF NOT EXISTS ops;
 
--- version exacte chargée depuis MLflow (jamais seulement l'alias, qui peut bouger)
 CREATE TABLE IF NOT EXISTS tracing.model_versions (
     model_id uuid PRIMARY KEY,
     tracking_uri text NOT NULL,
@@ -14,19 +11,15 @@ CREATE TABLE IF NOT EXISTS tracing.model_versions (
     UNIQUE (tracking_uri, registered_name, version)
 );
 
--- une ligne par appel HTTP sur un endpoint métier, erreurs comprises
 CREATE TABLE IF NOT EXISTS tracing.api_requests (
     request_id uuid PRIMARY KEY,
     started_at timestamptz NOT NULL,
     endpoint text NOT NULL CHECK (endpoint IN ('/predict', '/predict/batch', '/feedback')),
     http_status smallint NOT NULL CHECK (http_status BETWEEN 200 AND 599),
     item_count integer CHECK (item_count >= 0),
-    -- du début du traitement jusqu'avant l'écriture en base
     processing_duration_ms double precision NOT NULL CHECK (processing_duration_ms >= 0),
-    -- temps passé dans model.predict, NULL si aucune inférence
     inference_duration_ms double precision CHECK (inference_duration_ms >= 0),
     worker_pid integer NOT NULL,
-    -- change à chaque démarrage de worker (un PID peut être réutilisé)
     instance_id uuid NOT NULL,
     api_revision text NOT NULL,
     campaign_id text NOT NULL DEFAULT 'manual' CHECK (length(campaign_id) BETWEEN 1 AND 128),
@@ -45,11 +38,9 @@ CREATE TABLE IF NOT EXISTS tracing.predictions (
     UNIQUE (request_id, item_index)
 );
 
--- un seul feedback par prédiction, jamais modifié
 CREATE TABLE IF NOT EXISTS tracing.feedbacks (
     feedback_id uuid PRIMARY KEY,
-    -- vérifiée au commit : le feedback est inséré avant la ligne de requête,
-    -- dont le statut (201 ou 200) dépend du résultat de cette insertion
+    -- vérifiée au commit : le feedback est inséré avant sa ligne de requête
     request_id uuid NOT NULL UNIQUE REFERENCES tracing.api_requests (request_id)
         DEFERRABLE INITIALLY DEFERRED,
     prediction_id uuid NOT NULL UNIQUE REFERENCES tracing.predictions (prediction_id),
@@ -65,7 +56,6 @@ CREATE TABLE IF NOT EXISTS tracing.feedbacks (
     )
 );
 
--- CPU et mémoire de chaque worker, échantillonnés régulièrement
 CREATE TABLE IF NOT EXISTS tracing.worker_heartbeats (
     instance_id uuid NOT NULL,
     worker_pid integer NOT NULL,
@@ -87,7 +77,6 @@ CREATE TABLE IF NOT EXISTS ops.pipeline_runs (
     started_at timestamptz NOT NULL,
     ended_at timestamptz,
     status text NOT NULL CHECK (status IN ('running', 'completed', 'failed')),
-    -- promoted, champion_kept, rejected, no_new_data, invalid_data, error, crashed
     outcome text,
     batch_ids text[] NOT NULL DEFAULT '{}',
     mlflow_run_id text,
@@ -134,7 +123,6 @@ REVOKE ALL ON SCHEMA tracing, ops FROM PUBLIC;
 GRANT USAGE ON SCHEMA tracing TO api_writer, grafana_reader;
 GRANT USAGE ON SCHEMA ops TO pipeline_writer, grafana_reader;
 
--- l'API ajoute des traces mais ne peut ni les modifier ni les supprimer
 GRANT SELECT, INSERT ON ALL TABLES IN SCHEMA tracing TO api_writer;
 GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA ops TO pipeline_writer;
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA ops TO pipeline_writer;

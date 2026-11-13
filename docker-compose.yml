@@ -15,12 +15,10 @@ x-common-env: &common-env
   MLFLOW_TRACKING_URI: http://mlflow:7281
   MODEL_NAME: ${MODEL_NAME:-bikeshare-demand}
   MODEL_ALIAS: ${MODEL_ALIAS:-champion}
-  # mlflow : pas de barres de progression ni de messages décoratifs dans les logs
   MLFLOW_DISABLE_AGENT_HINT: "1"
   MLFLOW_ENABLE_ARTIFACTS_PROGRESS_BAR: "false"
   MLFLOW_SUPPRESS_PRINTING_URL_TO_STDOUT: "true"
   GIT_PYTHON_REFRESH: quiet
-  # par défaut le client mlflow réessaie pendant plusieurs minutes quand le serveur est arrêté
   MLFLOW_HTTP_REQUEST_MAX_RETRIES: "2"
   MLFLOW_HTTP_REQUEST_TIMEOUT: "20"
 
@@ -42,7 +40,6 @@ services:
       timeout: 5s
       retries: 20
 
-  # crée les rôles et les tables puis s'arrête
   db-init:
     <<: *api-image
     command: ["bikeshare", "db", "init"]
@@ -85,7 +82,6 @@ services:
     restart: unless-stopped
     command: ["prefect", "server", "start", "--host", "0.0.0.0", "--port", "4200"]
     environment:
-      # postgres plutôt que sqlite : sinon le serveur ne voit pas une automation créée après son démarrage
       PREFECT_SERVER_DATABASE_CONNECTION_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-bikeshare-local-postgres}@postgres:5432/prefect
       PREFECT_SERVER_UI_API_URL: http://localhost:${PREFECT_PORT:-4200}/api
       PREFECT_API_URL: http://127.0.0.1:4200/api
@@ -128,7 +124,6 @@ services:
     environment:
       <<: *common-env
       PREFECT_API_URL: http://prefect:4200/api
-      # fait remonter les logs de nos modules dans l'interface Prefect
       PREFECT_LOGGING_EXTRA_LOGGERS: bikeshare
       OPS_DATABASE_URL: postgresql://pipeline_writer:${OPS_DB_PASSWORD:-bikeshare-local-pipeline}@postgres:5432/bikeshare
       PIPELINE_SCHEDULE_SECONDS: ${PIPELINE_SCHEDULE_SECONDS:-600}
@@ -152,8 +147,6 @@ services:
       <<: *common-env
       API_HOST: 0.0.0.0
       API_WORKERS: ${API_WORKERS:-1}
-      # une prédiction = une ligne : les threads OpenMP de scikit-learn ne font que se gêner
-      # entre workers (mesuré : débit divisé par deux à 2 CPU sans cette limite)
       OMP_NUM_THREADS: ${API_OMP_THREADS:-1}
       API_DATABASE_URL: postgresql://api_writer:${API_DB_PASSWORD:-bikeshare-local-api}@postgres:5432/bikeshare
       API_DB_POOL_MAX: ${API_DB_POOL_MAX:-5}
@@ -187,7 +180,6 @@ services:
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/dashboards/api.json
-      # lu par le provisioning de la source de données
       GRAFANA_DB_PASSWORD: ${GRAFANA_DB_PASSWORD:-bikeshare-local-grafana}
     ports:
       - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"

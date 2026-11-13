@@ -1,12 +1,8 @@
 policy_id: bikeshare-promotion
 version: "1.0"
 
-# toutes les mesures sont faites sur les 7 derniers jours du lot le plus récent
 min_r2: 0.5
-# la baseline prédit la moyenne par heure et type de jour
 min_gain_vs_baseline_pct: 15
-# 0 = le candidat doit faire au moins aussi bien que le champion en place
 min_gain_vs_champion_pct: 0
-# un segment n'est jugé que s'il a assez de lignes
 min_segment_rows: 20
 reload_tolerance: 1.0e-6

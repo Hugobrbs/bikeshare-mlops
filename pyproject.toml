@@ -8,12 +8,10 @@ license = { text = "MIT" }
 authors = [{ name = "Hugo Barbosa" }]
 
 dependencies = [
-  # versions figées : un modèle sklearn ne se recharge bien qu'à version identique
   "pandas==2.2.3",
   "numpy==2.2.6",
   "scikit-learn==1.6.1",
   "mlflow==3.17.2",
-  # < 0.155 : au-delà le serveur prefect (lancé dans les tests) ne démarre plus
   "fastapi>=0.115,<0.155",
   "uvicorn[standard]>=0.34",
   "psycopg[binary,pool]>=3.2",
@@ -26,7 +24,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# uniquement pour le pipeline d'entraînement, pas installé dans l'image de l'API
 pipeline = [
   "prefect==3.8.8",
   "great-expectations==1.23.2",
@@ -64,8 +61,6 @@ src = ["src", "tests", "loadtests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "C4", "PT", "N", "RUF"]
-# RUF001-003 : faux positifs sur les accents et apostrophes du français
-# N803, N806 : X en majuscule, comme dans scikit-learn
 ignore = ["RUF001", "RUF002", "RUF003", "N803", "N806"]
 
 [tool.ruff.lint.isort]
