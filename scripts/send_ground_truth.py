@@ -1,11 +1,3 @@
-"""Simule le retour du terrain : prédit des heures réelles du dataset puis renvoie
-le nombre de locations réellement observé comme feedback.
-
-    uv run python scripts/send_ground_truth.py --month 2011-10 --count 200
-
-Sert à alimenter les panneaux de qualité observée du dashboard avec de vraies valeurs.
-"""
-
 import argparse
 import uuid
 from datetime import UTC, datetime

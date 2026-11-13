@@ -93,7 +93,6 @@ class FeedbackRequest(BaseModel):
     )
     prediction_id: UUID
     useful: bool | None = Field(default=None, description="Avis subjectif sur la prédiction.")
-    # bornes alignées sur ce que la base accepte (colonne integer, pas de caractère nul)
     observed_rentals: int | None = Field(
         default=None, ge=0, le=100_000, description="Nombre de locations réellement constaté."
     )

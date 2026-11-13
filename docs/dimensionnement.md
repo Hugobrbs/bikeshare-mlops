@@ -104,7 +104,7 @@ Campagne du 12 novembre 2026, 54 tirs. Médiane des deux répétitions de chaque
 
 **L'inférence domine le temps de réponse.** Sur la campagne `S-u10-r1`, côté serveur : p50 de 4,1 ms et p95 de 28,6 ms, dont 26,4 ms dans `model.predict`. Locust mesure un p95 de 37 ms côté client : le réseau local et l'écriture en base ajoutent moins de 10 ms.
 
-**Les threads OpenMP de scikit-learn coûtent plus de la moitié du débit si on les oublie.** Premier passage de M sans réglage (`M0`) : 91 req/s tenus au lieu de 234, avec le CPU à 187 % dès 20 utilisateurs. Par défaut scikit-learn lance autant de threads que de CPU pour chaque prédiction. Pour une seule ligne c'est inutile, et les threads des différents workers se gênent. `OMP_NUM_THREADS=1` est maintenant fixé dans `compose.yaml` ; le parallélisme vient des workers.
+**Les threads OpenMP de scikit-learn coûtent plus de la moitié du débit si on les oublie.** Premier passage de M sans réglage (`M0`) : 91 req/s tenus au lieu de 234, avec le CPU à 187 % dès 20 utilisateurs. Par défaut scikit-learn lance autant de threads que de CPU pour chaque prédiction. Pour une seule ligne c'est inutile, et les threads des différents workers se gênent. `OMP_NUM_THREADS=1` est maintenant fixé dans `docker-compose.yml` ; le parallélisme vient des workers.
 
 **Les traces en base recoupent Locust.** Campagne `S-u10-r1` : 3 476 requêtes comptées par Locust, 3 476 lignes dans `tracing.api_requests`. Campagne `L-u40-r1` : 12 515 des deux côtés. Sur un palier saturé (`L-u80-r1`) la base en compte 41 de plus (14 161 contre 14 120) : ce sont les requêtes encore en cours quand Locust s'arrête de compter.
 

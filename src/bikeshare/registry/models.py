@@ -27,9 +27,6 @@ class AliasChange:
 
 
 class ModelRegistry:
-    """Le modèle servi est celui que désigne l'alias. Promouvoir ou revenir en
-    arrière = déplacer l'alias, sans toucher aux versions."""
-
     def __init__(self, client: MlflowClient, name: str, alias: str = "champion") -> None:
         self.client = client
         self.name = name
@@ -39,7 +36,6 @@ class ModelRegistry:
         try:
             return self.client.get_model_version_by_alias(self.name, alias)
         except MlflowException as e:
-            # modèle pas encore enregistré, ou alias jamais posé
             if e.error_code in ("RESOURCE_DOES_NOT_EXIST", "INVALID_PARAMETER_VALUE"):
                 return None
             raise
@@ -69,7 +65,6 @@ class ModelRegistry:
             if previous is None:
                 raise PromotionRefusedError("aucune version précédente connue")
             to_version = previous.version
-        # selon le backend MLflow renvoie le numéro de version en int ou en str
         to_version = str(to_version)
         if to_version == str(current.version):
             raise PromotionRefusedError(f"la version {to_version} est déjà le champion")
@@ -89,8 +84,6 @@ class ModelRegistry:
         current_version = str(current.version) if current else None
         self.client.set_registered_model_alias(self.name, self.alias, version)
         if action == "rollback":
-            # la version qu'on quitte n'est plus servable : sans ça, relancer le rollback
-            # par erreur la remettrait en service
             self.client.set_model_version_tag(
                 self.name, current_version, "validation_status", "rolled_back"
             )

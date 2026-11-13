@@ -57,7 +57,6 @@ def test_forward_failure_does_not_lose_the_alert(caplog: pytest.LogCaptureFixtur
 
     assert response.status_code == 202
     assert ops.alerts == [(ALERT["subject"], ALERT["body"], False)]
-    # l'URL du webhook est un secret : elle ne doit pas finir dans les logs
     assert "HTTP 500" in caplog.text
     assert "JETON-SECRET" not in caplog.text
 

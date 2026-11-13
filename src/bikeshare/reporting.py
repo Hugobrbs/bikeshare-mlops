@@ -12,7 +12,6 @@ from bikeshare.data.schema import INPUT_COLUMNS, TARGET, TIMESTAMP
 
 
 def input_importance(model: Pipeline, test: pd.DataFrame, seed: int) -> dict[str, float]:
-    """Hausse de MAE quand on mélange une colonne d'entrée : plus c'est haut, plus elle compte."""
     inputs = test[list(INPUT_COLUMNS)]
     result = permutation_importance(
         model,

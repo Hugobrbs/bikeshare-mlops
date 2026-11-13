@@ -1,10 +1,3 @@
-"""Scénarios de charge de l'API de prédiction.
-
-    locust -f loadtests/locustfile.py OnlineUser --host http://localhost:8001
-
-Chaque réponse est vérifiée : un 200 dont le corps est incohérent compte comme un échec.
-"""
-
 import os
 import random
 import uuid
@@ -17,7 +10,6 @@ BATCH_SIZE = int(os.environ.get("BATCH_SIZE", "20"))
 
 
 def build_observations(count: int = 500, seed: int = 42) -> list[dict]:
-    """Observations valides générées une fois pour toutes : mêmes entrées à chaque tir."""
     rng = random.Random(seed)
     start = datetime(2012, 6, 1)
     observations = []
@@ -42,7 +34,6 @@ OBSERVATIONS = build_observations()
 
 class ApiUser(HttpUser):
     abstract = True
-    # temps de réflexion court : chaque utilisateur envoie environ 10 requêtes par seconde
     wait_time = between(0.05, 0.15)
 
     def on_start(self) -> None:
@@ -79,11 +70,9 @@ class ApiUser(HttpUser):
             return
         payload = {
             "feedback_id": str(uuid.uuid4()),
-            # une prédiction ne reçoit qu'un feedback : on la retire de la liste
             "prediction_id": self.unrated.pop(),
             "observed_rentals": random.randrange(0, 600),
             "observed_at": datetime.now(UTC).isoformat(),
-            # exclu des indicateurs de qualité du dashboard
             "label_source": "loadtest",
         }
         with self.client.post("/feedback", json=payload, catch_response=True) as response:
@@ -92,24 +81,18 @@ class ApiUser(HttpUser):
 
 
 class OnlineUser(ApiUser):
-    """Prédictions unitaires uniquement."""
-
     @task
     def predict(self) -> None:
         self.predict_one()
 
 
 class BatchUser(ApiUser):
-    """Lots de BATCH_SIZE observations."""
-
     @task
     def batch(self) -> None:
         self.predict_batch()
 
 
 class MixedUser(ApiUser):
-    """Trafic réaliste : surtout de l'unitaire, quelques lots, quelques feedbacks."""
-
     @task(8)
     def predict(self) -> None:
         self.predict_one()

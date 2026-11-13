@@ -118,7 +118,6 @@ def test_feedback_created_then_replayed(
 
     assert (first.http_status, replay.http_status) == (201, 200)
     assert count(admin, "feedbacks") == 1
-    # la requête d'origine reste celle rattachée au feedback
     stored = admin.execute("SELECT request_id FROM tracing.feedbacks").fetchone()[0]
     assert stored == first.request_id
     assert count(admin, "api_requests") == 3
@@ -141,7 +140,6 @@ def test_different_feedback_is_a_conflict(
 
     assert error.value.status == 409
     assert count(admin, "feedbacks") == 1
-    # la transaction refusée n'a rien laissé, même pas sa ligne de requête
     assert count(admin, "api_requests") == 2
 
 

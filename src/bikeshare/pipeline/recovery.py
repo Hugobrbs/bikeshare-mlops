@@ -17,12 +17,6 @@ MESSAGE = "exécutant arrêté pendant l'exécution"
 
 
 def mark_orphaned_runs(ops: OpsStore) -> list[str]:
-    """Passe en Crashed les runs restés Running après un arrêt brutal de l'exécutant.
-
-    Prefect ne détecte pas tout seul qu'un processus a disparu. Ce conteneur est le seul
-    à exécuter le flow : un run encore Running à son démarrage est forcément orphelin.
-    Le passage en Crashed déclenche l'alerte.
-    """
     running = FlowRunFilterState(type=FlowRunFilterStateType(any_=[StateType.RUNNING]))
     with get_client(sync_client=True) as client:
         runs = client.read_flow_runs(

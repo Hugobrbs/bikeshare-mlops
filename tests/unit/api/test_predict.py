@@ -133,7 +133,6 @@ def test_database_down_means_no_fake_success(
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "storage_unavailable"
     assert repository.predictions == {}
-    # sans base, le log est la seule trace : il doit porter l'identifiant rendu au client
     assert response.json()["request_id"] in caplog.text
 
 
@@ -158,7 +157,6 @@ def test_sql_error_that_is_not_an_outage_is_a_traced_500(
 
     response = client.post("/predict", json={"observation": observation})
 
-    # ni 503 (la base répond), ni perdu : le client ne doit pas réessayer en boucle
     assert response.status_code == 500
     assert response.json()["error"]["code"] == "internal_error"
     assert repository.requests[-1].error_code == "internal_error"

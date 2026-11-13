@@ -14,7 +14,6 @@ class JsonFormatter(logging.Formatter):
             "logger": record.name,
             "message": record.getMessage(),
         }
-        # champs passés via extra={...}
         payload.update({k: v for k, v in record.__dict__.items() if k not in _STANDARD_ATTRS})
         if record.exc_info:
             payload["exception"] = self.formatException(record.exc_info)
@@ -32,6 +31,5 @@ def configure_logging(level: str = "INFO", fmt: str = "text") -> None:
     root = logging.getLogger()
     root.handlers[:] = [handler]
     root.setLevel(level.upper())
-    # bibliothèques trop bavardes en INFO (une ligne par requête HTTP, détails internes de GX)
     for noisy in ("httpx", "great_expectations"):
         logging.getLogger(noisy).setLevel(logging.WARNING)

@@ -27,24 +27,15 @@ def ingest_pending(
     rules: ValidationConfig,
     on_report: Callable[[dict], None] | None = None,
 ) -> list[BatchRecord]:
-    """Valide puis accepte les lots en attente, du plus ancien au plus récent.
-
-    Le premier lot invalide part en quarantaine et lève DataValidationError :
-    on n'entraîne jamais sur des données douteuses.
-    """
     accepted = []
     for incoming in store.pending():
         known = store.accepted()
         try:
             if incoming.stem in {r.batch_id for r in known}:
-                # relivraison d'un lot déjà accepté : sans effet si le contenu est identique
                 store.accept(incoming)
                 continue
             report = validate_file(incoming, rules, known[-1].batch_id if known else None)
         except Exception as e:
-            # fichier mal nommé, colonne au mauvais type, lot déjà accepté relivré avec un
-            # autre contenu... Traité comme un lot invalide : laissé en attente, il ferait
-            # échouer tous les runs suivants
             failure = {"check": "validation_crashed", "observed_value": repr(e)[:500]}
             report = ValidationReport(incoming.stem, False, 0, 1, [failure])
 

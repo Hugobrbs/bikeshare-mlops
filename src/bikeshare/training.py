@@ -26,7 +26,6 @@ class TrainingResult:
 
 
 def temporal_split(frame: pd.DataFrame, test_days: int) -> Split:
-    """Les `test_days` derniers jours servent de test, tout ce qui précède d'entraînement."""
     cutoff = frame[TIMESTAMP].max().normalize() - pd.Timedelta(days=test_days - 1)
     train = frame[frame[TIMESTAMP] < cutoff]
     test = frame[frame[TIMESTAMP] >= cutoff]
@@ -36,8 +35,6 @@ def temporal_split(frame: pd.DataFrame, test_days: int) -> Split:
 
 
 class HourlyProfileBaseline(BaseEstimator, RegressorMixin):
-    """Moyenne des locations par heure et type de jour (ouvré ou non)."""
-
     def fit(self, X: pd.DataFrame, y: pd.Series) -> "HourlyProfileBaseline":
         keys = build_features(X)[["hour", "workingday"]]
         self.profile_ = y.groupby([keys["hour"], keys["workingday"]]).mean().to_dict()

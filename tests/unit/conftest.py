@@ -6,7 +6,6 @@ from bikeshare.data.schema import DOMAIN_COLUMNS
 
 
 def make_domain_frame(days: int = 60, start: str = "2011-03-01", seed: int = 0) -> pd.DataFrame:
-    """Observations horaires avec un vrai signal : pics aux heures de pointe, moins le week-end."""
     rng = np.random.default_rng(seed)
     timestamp = pd.date_range(start, periods=days * 24, freq="h")
     hour = timestamp.hour.to_numpy()

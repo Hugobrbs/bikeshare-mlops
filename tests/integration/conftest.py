@@ -35,7 +35,6 @@ def url_for(role: str) -> str:
 
 @pytest.fixture(scope="session")
 def database() -> str:
-    """Base PostgreSQL jetable, initialisée comme en vrai. Voir `make test-integration`."""
     if not ADMIN_URL:
         pytest.skip("TEST_ADMIN_DATABASE_URL non défini")
     init_database(ADMIN_URL, PASSWORDS)
@@ -51,7 +50,6 @@ def admin(database: str) -> Iterator[psycopg.Connection]:
 
 @pytest.fixture(scope="session")
 def prefect_server() -> Iterator[None]:
-    """Serveur Prefect temporaire : les flows tournent avec le vrai moteur d'orchestration."""
     with prefect_test_harness():
         yield
 

@@ -27,8 +27,6 @@ class BatchRecord:
 
 
 class BatchStore:
-    """Dossiers de données : incoming (arrivée), curated (acceptés), quarantine (rejetés)."""
-
     def __init__(self, data_dir: Path) -> None:
         self.source_dir = data_dir / "source"
         self.incoming_dir = data_dir / "incoming"
@@ -57,7 +55,6 @@ class BatchStore:
         if batch_id in records:
             if records[batch_id].source_sha256 != digest:
                 raise BatchConflictError(f"lot {batch_id} déjà accepté avec un autre contenu")
-            # même lot rejoué : rien à refaire
             incoming_file.unlink()
             return records[batch_id]
 
@@ -93,7 +90,6 @@ class BatchStore:
         return path
 
     def load(self, last: int | None = None) -> pd.DataFrame:
-        """Concatène les lots acceptés (les `last` plus récents si précisé)."""
         records = self._select(last)
         if not records:
             raise FileNotFoundError("aucun lot accepté")
@@ -104,7 +100,6 @@ class BatchStore:
         return pd.concat(frames, ignore_index=True)
 
     def fingerprint(self, last: int | None = None) -> str:
-        """Empreinte du jeu d'entraînement : change dès qu'un lot change."""
         content = "\n".join(f"{r.batch_id}:{r.source_sha256}" for r in self._select(last))
         return hashlib.sha256(content.encode()).hexdigest()
 

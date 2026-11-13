@@ -31,9 +31,7 @@ def test_repeats_are_aggregated_with_the_median() -> None:
 
     assert (low["users"], low["rps"], low["p95_ms"], low["repeats"]) == (10, 89, 35, 2)
     assert low["slo"]
-    # un palier n'est conforme que si toutes ses répétitions le sont
     assert not middle["slo"]
-    # des échecs suffisent à sortir de l'objectif, même avec une bonne latence
     assert not high["slo"]
 
 

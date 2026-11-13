@@ -1,10 +1,3 @@
-"""Rejeu du dataset historique par lots mensuels.
-
-Le dataset UCI est figé (2011-2012). Pour simuler l'arrivée de nouvelles données,
-chaque appel découpe le mois suivant et le dépose dans data/incoming, comme le
-ferait un export périodique. Le pipeline ne lit que ce dossier.
-"""
-
 import logging
 from dataclasses import dataclass
 from enum import StrEnum
@@ -71,11 +64,6 @@ def publish_batches(
     count: int = 1,
     corruption: Corruption | None = None,
 ) -> list[PublishedBatch]:
-    """Dépose les prochains mois dans incoming_dir.
-
-    delivered = lots acceptés + lots en attente. Un lot rejeté n'y est pas,
-    il est donc relivré au prochain appel.
-    """
     source = pd.read_csv(source_file)
     months = month_of(source["dteday"])
     incoming_dir.mkdir(parents=True, exist_ok=True)

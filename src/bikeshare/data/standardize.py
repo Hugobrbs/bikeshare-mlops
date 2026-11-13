@@ -12,10 +12,6 @@ from bikeshare.data.schema import (
 
 
 def to_domain(source: pd.DataFrame) -> pd.DataFrame:
-    """Passe du format UCI (valeurs normalisées) à des unités physiques.
-
-    casual et registered sont écartées : leur somme est exactement la cible.
-    """
     timestamp = pd.to_datetime(source["dteday"], format="%Y-%m-%d") + pd.to_timedelta(
         source["hr"], unit="h"
     )

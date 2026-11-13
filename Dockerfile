@@ -14,7 +14,6 @@ COPY src ./src
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-editable
 
-# même base + prefect, great-expectations et matplotlib
 FROM build AS build-pipeline
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-editable --extra pipeline
@@ -37,7 +36,6 @@ USER app
 CMD ["bikeshare", "pipeline", "start"]
 
 
-# en dernier : c'est l'image construite par défaut (docker build sans --target)
 FROM runtime AS api
 COPY --from=build /opt/venv /opt/venv
 USER app

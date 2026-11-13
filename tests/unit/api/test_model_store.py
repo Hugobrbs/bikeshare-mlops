@@ -116,7 +116,6 @@ def test_model_trained_with_other_features_is_refused(
     with pytest.raises(IncompatibleModelError):
         store.refresh()
 
-    # le modèle compatible déjà chargé continue de servir
     assert store.current.version == 1
     assert "IncompatibleModelError" in store.last_error
 
@@ -127,7 +126,6 @@ def test_registry_outage_keeps_the_loaded_model(
     domain_frame: pd.DataFrame,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # sans ça le client mlflow réessaie pendant plusieurs minutes
     monkeypatch.setenv("MLFLOW_HTTP_REQUEST_MAX_RETRIES", "0")
     monkeypatch.setenv("MLFLOW_HTTP_REQUEST_TIMEOUT", "2")
     registry.set_registered_model_alias(

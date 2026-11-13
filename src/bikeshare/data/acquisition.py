@@ -18,8 +18,6 @@ RETRYABLE_STATUS = {408, 425, 429, 500, 502, 503, 504}
 
 
 class AcquisitionError(RuntimeError):
-    """Aucune source n'a répondu. transient=True si réessayer peut marcher."""
-
     def __init__(self, message: str, *, transient: bool) -> None:
         super().__init__(message)
         self.transient = transient
@@ -55,10 +53,6 @@ def fetch_source(
     *,
     transport: httpx.BaseTransport | None = None,
 ) -> SourceSnapshot:
-    """Télécharge le fichier source s'il n'est pas déjà présent et intact.
-
-    Pas de retry ici : c'est l'orchestrateur qui décide de réessayer ou non.
-    """
     target = source_dir / dataset.member
     if target.is_file() and sha256_file(target) == dataset.member_sha256:
         logger.info("source déjà présente : %s", target)

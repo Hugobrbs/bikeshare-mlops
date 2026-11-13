@@ -42,8 +42,6 @@ from bikeshare.settings import Settings, get_settings
 logger = logging.getLogger(__name__)
 
 TRACED_ENDPOINTS = {"/predict", "/predict/batch", "/feedback"}
-# base injoignable ou pool épuisé. Les autres erreurs SQL (donnée refusée, contrainte)
-# ne sont pas des pannes : elles remontent en 500 et sont tracées comme telles
 STORAGE_ERRORS = (psycopg.OperationalError,)
 
 DESCRIPTION = """
@@ -70,8 +68,6 @@ ERRORS = {
 
 
 class Service:
-    """Ce dont un worker a besoin pour répondre : config, base, modèle et son identité."""
-
     def __init__(self, settings: Settings, repository: TraceRepository, models: ModelStore) -> None:
         self.settings = settings
         self.repository = repository
@@ -133,7 +129,6 @@ def predict_and_trace(
     ]
     trace = service.trace(request, 200, item_count=len(rows), inference_ms=inference_ms)
     try:
-        # on ne répond 200 qu'une fois la requête et toutes ses prédictions écrites
         service.repository.save_predictions(trace, model.model_id, rows)
     except STORAGE_ERRORS as e:
         logger.error("prédictions non enregistrées, request_id=%s", trace.request_id)
@@ -151,7 +146,6 @@ def predict_and_trace(
 
 
 async def keep_model_fresh(service: Service) -> None:
-    """Relit l'alias à intervalle régulier, plus souvent tant qu'aucun modèle n'est chargé."""
     refresh = service.settings.model_refresh_seconds
     while True:
         await asyncio.sleep(refresh if service.models.current else min(refresh, 5))
@@ -186,7 +180,6 @@ def create_app(
     models: ModelStore | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
-    # chaque worker uvicorn est un processus à part : il configure ses propres logs
     configure_logging(settings.log_level, settings.log_format)
     if repository is None:
         if settings.api_database_url is None:
@@ -246,7 +239,6 @@ def create_app(
     ) -> JSONResponse:
         request_id: UUID = getattr(request.state, "request_id", None) or uuid4()
         should_trace = request.url.path in TRACED_ENDPOINTS and hasattr(request.state, "t0")
-        # si c'est la base qui est en panne, inutile d'attendre une seconde fois une connexion
         lost = should_trace and code == "storage_unavailable"
         if should_trace and not lost:
             trace = service.trace(request, status, error_code=code)
@@ -255,7 +247,6 @@ def create_app(
             except STORAGE_ERRORS:
                 lost = True
         if lost:
-            # il ne reste que ce log, avec l'identifiant rendu au client
             logger.error(
                 "erreur non tracée en base, request_id=%s statut=%s code=%s",
                 request_id,
@@ -381,8 +372,7 @@ def create_app(
             raise ApiError(503, "registry_unavailable", "Registre de modèles injoignable.") from e
         return served_model(service)
 
-    # async : cette sonde ne passe pas par le pool de threads, elle répond même quand
-    # tous les threads attendent une base en panne
+    # async : répond même quand le pool de threads est saturé
     @app.get("/health/live", response_model=Health, tags=["Santé"])
     async def live() -> Health:
         """Le processus répond."""
