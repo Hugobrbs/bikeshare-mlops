@@ -20,9 +20,19 @@ class ReplayConfig(Section):
     bootstrap_batches: int = Field(default=6, ge=1)
 
 
+class ValidationConfig(Section):
+    min_hour_coverage: float = Field(default=0.90, gt=0, le=1)
+    max_missing_days: int = Field(default=1, ge=0)
+    max_rentals: int = Field(default=5000, gt=0)
+    mean_rentals_min: float = Field(default=5, ge=0)
+    mean_rentals_max: float = Field(default=1500, gt=0)
+    min_temperature_std: float = Field(default=0.02, ge=0)
+
+
 class PipelineConfig(Section):
     dataset: DatasetConfig
     replay: ReplayConfig = ReplayConfig()
+    validation: ValidationConfig = ValidationConfig()
 
 
 def load_pipeline_config(path: Path) -> PipelineConfig:

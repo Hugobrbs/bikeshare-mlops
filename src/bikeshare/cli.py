@@ -77,6 +77,23 @@ def data_publish(
         typer.echo(f"{batch.batch_id} : {batch.rows} lignes -> {batch.path}")
 
 
+@data_app.command("ingest")
+def data_ingest() -> None:
+    """Contrôle les lots en attente : acceptés, ou mis en quarantaine au premier défaut."""
+    # import tardif : great_expectations est lent à charger et absent de l'image de l'API
+    from bikeshare.data.ingestion import ingest_pending
+    from bikeshare.data.validation import DataValidationError
+
+    settings = get_settings()
+    config = load_pipeline_config(settings.pipeline_config)
+    try:
+        accepted = ingest_pending(BatchStore(settings.data_dir), config.validation)
+    except DataValidationError as e:
+        typer.echo(f"échec : {e}", err=True)
+        raise typer.Exit(1) from e
+    typer.echo(f"lots acceptés : {[r.batch_id for r in accepted]}")
+
+
 @data_app.command("status")
 def data_status() -> None:
     """Liste les lots acceptés, en attente et en quarantaine."""

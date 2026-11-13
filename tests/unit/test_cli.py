@@ -79,6 +79,28 @@ def test_publish_with_corruption(project: Path) -> None:
     assert "372 lignes" in result.stdout
 
 
+def test_ingest_accepts_valid_batches(project: Path) -> None:
+    runner.invoke(app, ["data", "publish", "--count", "2"])
+
+    result = runner.invoke(app, ["data", "ingest"])
+    status = json.loads(runner.invoke(app, ["data", "status"]).stdout)
+
+    assert result.exit_code == 0
+    assert status["accepted"] == ["2011-01", "2011-02"]
+    assert status["pending"] == []
+
+
+def test_ingest_fails_on_invalid_batch(project: Path) -> None:
+    runner.invoke(app, ["data", "publish", "--corrupt", "negative-rentals"])
+
+    result = runner.invoke(app, ["data", "ingest"])
+    status = json.loads(runner.invoke(app, ["data", "status"]).stdout)
+
+    assert result.exit_code == 1
+    assert status["accepted"] == []
+    assert len(status["quarantined"]) == 1
+
+
 def test_publish_without_dataset(project: Path) -> None:
     (project / "data" / "source" / "hour.csv").unlink()
 
