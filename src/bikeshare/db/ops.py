@@ -11,12 +11,6 @@ logger = logging.getLogger(__name__)
 
 
 class OpsStore:
-    """Suivi du pipeline dans PostgreSQL (schéma ops), pour Grafana.
-
-    Sans url, ou si la base ne répond pas, on se contente d'un warning : Prefect
-    et MLflow restent la référence, ces tables ne doivent pas faire échouer un entraînement.
-    """
-
     def __init__(self, url: str | None) -> None:
         self.url = url
 

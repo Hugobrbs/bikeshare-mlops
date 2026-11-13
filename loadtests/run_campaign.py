@@ -1,12 +1,3 @@
-"""Campagne de charge : compare plusieurs configurations du conteneur de l'API.
-
-    uv run python loadtests/run_campaign.py --name 2026-11-12
-
-Pour chaque configuration (CPU, mémoire, workers uvicorn) puis chaque palier d'utilisateurs :
-redémarrage de l'API, chauffe, tir mesuré avec Locust, relevé CPU/mémoire via docker stats.
-Résultats bruts dans loadtests/results/<name>/raw, synthèse dans summary.csv.
-"""
-
 import argparse
 import csv
 import os
@@ -19,17 +10,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 API_URL = "http://localhost:8001"
 
-# une configuration = ce qu'on donnerait à un pod
 CONFIGS = [
     {"name": "S", "cpus": "1.0", "memory": "768M", "workers": 1, "omp_threads": 1},
     {"name": "M", "cpus": "2.0", "memory": "1280M", "workers": 2, "omp_threads": 1},
     {"name": "L", "cpus": "4.0", "memory": "2304M", "workers": 4, "omp_threads": 1},
-    # M sans limiter les threads OpenMP de scikit-learn, pour mesurer ce que coûte l'oubli
     {"name": "M0", "cpus": "2.0", "memory": "1280M", "workers": 2, "omp_threads": 2},
 ]
 DEFAULT_CONFIGS = ["S", "M", "L"]
 USER_LEVELS = [5, 10, 20, 40, 80, 160]
-# le générateur de charge tourne sur plusieurs coeurs pour ne pas saturer avant l'API
 LOCUST_PROCESSES = 4
 
 
@@ -65,13 +53,10 @@ def start_api(config: dict) -> None:
     }
     compose("up", "-d", "--force-recreate", "--no-deps", "api", env=env)
     wait_ready()
-    # /health/ready ne répond que pour un worker : on laisse aux autres le temps de charger
     time.sleep(5 + 2 * config["workers"])
 
 
 class StatsSampler(threading.Thread):
-    """Relève CPU et mémoire du conteneur de l'API pendant un tir."""
-
     def __init__(self) -> None:
         super().__init__(daemon=True)
         self.samples: list[tuple[float, float]] = []
@@ -122,7 +107,7 @@ def locust(
     ).split()
     if csv_prefix:
         command += ["--csv", str(csv_prefix)]
-    # code de sortie 1 = des requêtes en échec : un résultat de mesure, pas une erreur du script
+    # code de sortie 1 = des requêtes en échec, pas une erreur du script
     subprocess.run(
         command, cwd=ROOT, env={**os.environ, "CAMPAIGN_ID": campaign}, capture_output=True
     )
@@ -135,13 +120,10 @@ def read_aggregate(csv_prefix: Path) -> dict:
 
 
 def percentile(stats: dict, name: str) -> int | None:
-    # Locust écrit "N/A" quand aucune requête n'a abouti
     return int(stats[name]) if stats[name].isdigit() else None
 
 
 def append_row(path: Path, row: dict) -> None:
-    """Ecrit chaque tir dès qu'il est terminé : une erreur en cours de campagne ne perd
-    pas les mesures déjà faites, et on peut lancer une configuration à la fois."""
     is_new = not path.exists()
     with path.open("a", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=list(row))

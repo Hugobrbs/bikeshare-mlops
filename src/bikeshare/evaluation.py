@@ -27,7 +27,6 @@ def segment_masks(frame: pd.DataFrame) -> dict[str, pd.Series]:
 
 
 def evaluate(model: object, frame: pd.DataFrame) -> dict:
-    """Métriques globales et MAE par segment sur un jeu qui contient la cible."""
     y_true = frame[TARGET]
     y_pred = np.asarray(model.predict(frame[list(INPUT_COLUMNS)]), dtype=float)
     metrics = regression_metrics(y_true, y_pred)

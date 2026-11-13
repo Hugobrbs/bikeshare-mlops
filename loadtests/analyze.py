@@ -1,19 +1,9 @@
-"""Synthèse d'une campagne de charge.
-
-    uv run python loadtests/analyze.py loadtests/results/2026-11-12
-
-Lit summary.csv, agrège les répétitions de chaque palier (médiane) et écrit report.md :
-un tableau par configuration et la capacité soutenable, c'est-à-dire le plus grand
-débit observé sur un palier où toutes les répétitions respectent l'objectif de service.
-"""
-
 import argparse
 import csv
 import statistics
 from collections import defaultdict
 from pathlib import Path
 
-# objectif fixé avant les mesures, pour /predict vu du client
 SLO_P95_MS = 150
 SLO_FAILURE_PCT = 1.0
 
@@ -35,7 +25,6 @@ def aggregate(rows: list[dict]) -> list[dict]:
         groups[(row["config"], row["cpus"], row["workers"], int(row["users"]))].append(row)
 
     levels = []
-    # de la plus petite configuration à la plus grande
     for (config, cpus, workers, users), repeats in sorted(
         groups.items(), key=lambda item: (float(item[0][1]), item[0][0], item[0][3])
     ):
@@ -49,7 +38,6 @@ def aggregate(rows: list[dict]) -> list[dict]:
 
 
 def capacities(levels: list[dict]) -> dict[str, dict | None]:
-    """Par configuration : le palier conforme au débit le plus élevé."""
     best: dict[str, dict | None] = {}
     for level in levels:
         best.setdefault(level["config"], None)

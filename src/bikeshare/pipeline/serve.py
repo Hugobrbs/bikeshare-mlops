@@ -5,11 +5,6 @@ DEPLOYMENT_NAME = "replay-mensuel"
 
 
 def serve() -> None:
-    """Sert le déploiement planifié : chaque exécution traite le mois suivant.
-
-    Le processus reste actif et exécute lui-même les runs (pas de work pool).
-    limit=1 : jamais deux entraînements en même temps.
-    """
     settings = get_settings()
     training_pipeline.serve(
         name=DEPLOYMENT_NAME,

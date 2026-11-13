@@ -80,7 +80,6 @@ def test_version_left_by_a_rollback_cannot_come_back_by_mistake(registry: ModelR
     registry.promote(v2, actor="pipeline", reason="v2")
     registry.rollback(actor="hugo", reason="régression en production")
 
-    # relancer la commande ne doit pas remettre v2 en service
     with pytest.raises(PromotionRefusedError, match="aucune version précédente"):
         registry.rollback(actor="hugo", reason="double clic")
     with pytest.raises(PromotionRefusedError, match="non servable"):

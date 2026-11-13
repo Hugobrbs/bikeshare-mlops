@@ -24,8 +24,6 @@ class PromotionPolicy(BaseModel):
 
 @dataclass
 class Evidence:
-    """Tout ce qui est mesuré sur le même jeu de test avant de décider."""
-
     candidate: dict
     baseline: dict
     champion: dict | None = None
@@ -70,7 +68,6 @@ def decide(evidence: Evidence, policy: PromotionPolicy) -> Decision:
         if segment["mae"] > reference["mae"]:
             reasons.append(f"segment {name} moins bon que la baseline")
 
-    # une preuve manquante ne vaut pas acceptation
     if evidence.reload_delta is None:
         reasons.append("rechargement depuis le registre non vérifié")
     elif evidence.reload_delta > policy.reload_tolerance:

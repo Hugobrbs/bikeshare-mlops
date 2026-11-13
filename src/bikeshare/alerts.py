@@ -16,12 +16,10 @@ class Alert(BaseModel):
 
 
 def forward(url: str, alert: Alert, transport: httpx.BaseTransport | None = None) -> bool:
-    """Relaie vers un webhook externe au format {"text": ...} (Slack, Discord /slack...)."""
     try:
         with httpx.Client(timeout=10, transport=transport) as client:
             response = client.post(url, json={"text": f"{alert.subject}\n{alert.body}"})
             response.raise_for_status()
-    # le message d'erreur de httpx contient l'URL du webhook, qui est un secret
     except httpx.HTTPStatusError as e:
         logger.warning("alerte non relayée : HTTP %s", e.response.status_code)
         return False
@@ -36,7 +34,6 @@ def create_app(
     ops: OpsStore | None = None,
     transport: httpx.BaseTransport | None = None,
 ) -> FastAPI:
-    """Petit service qui reçoit les alertes de Prefect, les garde en base et les relaie."""
     settings = settings or get_settings()
     if ops is None:
         url = settings.ops_database_url

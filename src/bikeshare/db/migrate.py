@@ -7,7 +7,6 @@ ROLES = ("api_writer", "pipeline_writer", "grafana_reader")
 
 
 def init_database(admin_url: str, passwords: dict[str, str]) -> None:
-    """Crée (ou met à jour) les rôles puis applique schema.sql. Rejouable."""
     with psycopg.connect(admin_url) as conn:
         for role in ROLES:
             exists = conn.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (role,)).fetchone()

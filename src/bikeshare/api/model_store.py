@@ -32,13 +32,6 @@ class LoadedModel:
 
 
 class ModelStore:
-    """Garde en mémoire le modèle désigné par l'alias et suit ses déplacements.
-
-    L'alias est relu régulièrement : une promotion ou un retour arrière dans MLflow
-    change le modèle servi sans redéployer l'API. Si MLflow ne répond plus, le
-    modèle déjà chargé continue de servir.
-    """
-
     def __init__(self, tracking_uri: str, name: str, alias: str, register: RegisterModel) -> None:
         self.tracking_uri = tracking_uri
         self.name = name
@@ -50,7 +43,6 @@ class ModelStore:
         self._lock = threading.Lock()
 
     def refresh(self) -> bool:
-        """Recharge si l'alias pointe sur une autre version. Retourne True si le modèle a changé."""
         with self._lock:
             try:
                 changed = self._refresh()
@@ -77,7 +69,6 @@ class ModelStore:
         pipeline = mlflow.sklearn.load_model(f"models:/{self.name}/{version}")
         model_id = self.register(self.tracking_uri, self.name, version, target.run_id)
         previous = self.current.version if self.current else None
-        # l'ancien modèle sert jusqu'à cette affectation : pas de trou de service
         self.current = LoadedModel(
             model_id=model_id,
             name=self.name,

@@ -25,7 +25,6 @@ OBSERVATION = {
 
 @pytest.fixture
 def client(repository: TraceRepository) -> Iterator[TestClient]:
-    """La vraie API et la vraie base ; seul le modèle est simulé."""
     models = FakeModelStore()
     model_id = repository.register_model("http://mlflow", "bikeshare-demand", 3, "run-abc")
     models.current = replace(models.current, model_id=model_id)
@@ -120,7 +119,6 @@ def test_feedback_lifecycle(client: TestClient, admin: psycopg.Connection) -> No
         " WHERE endpoint = '/feedback' ORDER BY started_at"
     ).fetchall()
     assert [status for (status,) in traced] == [201, 200, 409, 404]
-    # écart entre prévu (80) et observé (95), comme le calcule le dashboard
     mae = scalar(
         admin,
         "SELECT avg(abs(f.observed_rentals - p.predicted_rentals)) FROM tracing.feedbacks f"

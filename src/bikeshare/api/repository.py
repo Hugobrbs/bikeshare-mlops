@@ -70,16 +70,12 @@ def request_params(trace: RequestTrace) -> tuple:
 
 
 class TraceRepository:
-    """Écritures PostgreSQL de l'API. Chaque méthode est une transaction :
-    soit tout est écrit, soit rien."""
-
     def __init__(self, url: str, min_size: int = 1, max_size: int = 5) -> None:
         self.pool = ConnectionPool(
             url, min_size=min_size, max_size=max_size, open=False, timeout=1, name="api"
         )
 
     def open(self) -> None:
-        # wait=False : l'API démarre même si la base est arrêtée, /health/ready le signalera
         self.pool.open(wait=False)
 
     def close(self) -> None:
@@ -94,7 +90,6 @@ class TraceRepository:
             return False
 
     def register_model(self, tracking_uri: str, name: str, version: int, run_id: str) -> UUID:
-        """Plusieurs workers chargent la même version : le premier insère, les autres relisent."""
         with self.pool.connection() as conn:
             conn.execute(
                 """
@@ -146,12 +141,6 @@ class TraceRepository:
     def save_feedback(
         self, trace: RequestTrace, feedback: FeedbackRow
     ) -> Literal["created", "already_recorded"]:
-        """Un feedback par prédiction. Rejouer le même envoi ne crée rien de plus.
-
-        Les doublons sont arbitrés par les contraintes d'unicité, pas par un
-        "je vérifie puis j'insère" qui laisserait passer deux envois simultanés.
-        Met à jour trace.http_status (201 ou 200) avant d'écrire la ligne de requête.
-        """
         with self.pool.connection() as conn:
             known = conn.execute(
                 "SELECT 1 FROM tracing.predictions WHERE prediction_id = %s",
@@ -188,7 +177,6 @@ class TraceRepository:
                     """,
                     (feedback.feedback_id,),
                 ).fetchone()
-                # lever ici annule la transaction ; le 409 est tracé par le gestionnaire d'erreurs
                 if existing is None:
                     raise feedback_conflict("Cette prédiction a déjà reçu un autre feedback.")
                 if existing != (

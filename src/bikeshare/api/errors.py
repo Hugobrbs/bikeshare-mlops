@@ -1,6 +1,4 @@
 class ApiError(Exception):
-    """Erreur prévue par le contrat de l'API : code court pour le client, pas de stacktrace."""
-
     def __init__(self, status: int, code: str, message: str) -> None:
         super().__init__(message)
         self.status = status

@@ -93,7 +93,7 @@ def data_publish(
 @data_app.command("ingest")
 def data_ingest() -> None:
     """Contrôle les lots en attente : acceptés, ou mis en quarantaine au premier défaut."""
-    # import tardif : great_expectations est lent à charger et absent de l'image de l'API
+    # import tardif : great_expectations est absent de l'image de l'API
     from bikeshare.data.ingestion import ingest_pending
     from bikeshare.data.validation import DataValidationError
 
@@ -178,14 +178,12 @@ def pipeline_start() -> None:
     try:
         first_run = make_registry().champion() is None
     except Exception:
-        # mlflow injoignable : on sert quand même le planning, les runs alerteront
         logger.exception("registre de modèles injoignable au démarrage")
         first_run = False
     if first_run:
         try:
             training_pipeline()
         except Exception:
-            # l'échec est déjà tracé et alerté, le planning prendra le relais
             logger.exception("premier entraînement en échec")
     serve()
 

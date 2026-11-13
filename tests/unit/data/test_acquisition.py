@@ -35,8 +35,6 @@ def make_dataset(urls: list[str] | None = None) -> DatasetConfig:
 
 
 class FakeServer:
-    """Répond selon l'hôte et garde la trace des appels."""
-
     def __init__(self, responses: dict[str, httpx.Response | Exception]) -> None:
         self.responses = responses
         self.calls: list[str] = []

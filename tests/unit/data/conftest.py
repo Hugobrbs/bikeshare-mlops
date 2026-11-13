@@ -8,14 +8,11 @@ from bikeshare.data.schema import SOURCE_COLUMNS
 
 
 def make_source(months: list[str], seed: int = 0) -> pd.DataFrame:
-    """Faux hour.csv : toutes les heures des mois demandés, valeurs plausibles."""
     rng = np.random.default_rng(seed)
     frames = []
     for month in months:
         hours = pd.date_range(f"{month}-01", periods=pd.Period(month).days_in_month * 24, freq="h")
         n = len(hours)
-        # profil horaire + effet de la température : la baseline (moyenne par heure)
-        # ne voit pas le second, un modèle si
         rush = np.isin(hours.hour, (8, 17, 18)) & (hours.dayofweek < 5)
         temp = rng.uniform(0.1, 0.9, n).round(2)
         casual = rng.poisson(5 + hours.hour.to_numpy())

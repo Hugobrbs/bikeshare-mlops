@@ -4,8 +4,7 @@ from sklearn.base import BaseEstimator, TransformerMixin
 
 from bikeshare.data.schema import TIMESTAMP, WEATHER_CODES
 
-# À incrémenter dès que build_features change : l'API refuse de charger un modèle
-# entraîné avec une autre version.
+# à incrémenter dès que build_features change
 FEATURE_VERSION = "1"
 
 FEATURES = (
@@ -32,7 +31,6 @@ def build_features(frame: pd.DataFrame) -> pd.DataFrame:
             "month": timestamp.dt.month,
             "holiday": holiday.astype(int),
             "workingday": ((timestamp.dt.dayofweek < 5) & ~holiday).astype(int),
-            # un code météo jamais vu est ramené dans la plage connue
             "weather_code": frame["weather_code"].clip(WEATHER_CODES[0], WEATHER_CODES[-1]),
             "temperature_c": frame["temperature_c"],
             "feels_like_c": frame["feels_like_c"],
@@ -45,8 +43,6 @@ def build_features(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 class FeatureBuilder(BaseEstimator, TransformerMixin):
-    """build_features sous forme d'étape sklearn, pour qu'elle soit sérialisée avec le modèle."""
-
     def fit(self, X: pd.DataFrame, y: object = None) -> "FeatureBuilder":
         return self
 

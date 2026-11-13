@@ -87,7 +87,6 @@ def validate_batch(
     if not BATCH_ID.match(batch_id):
         raise ValueError(f"identifiant de lot invalide : {batch_id!r} (attendu AAAA-MM)")
 
-    # GX journalise en INFO chaque dossier temporaire qu'il crée
     logging.getLogger("great_expectations.data_context.types.base").setLevel(logging.WARNING)
     expectations = build_expectations(batch_id, rules)
     context = gx.get_context(mode="ephemeral")
@@ -130,7 +129,6 @@ def _describe(expectation: dict) -> dict:
 
 
 def _extra_checks(batch: pd.DataFrame, batch_id: str, previous_batch_id: str | None) -> list[dict]:
-    """Contrôles qui ne s'expriment pas avec une expectation GX."""
     failures = []
     if previous_batch_id and batch_id != following_month(previous_batch_id):
         failures.append(

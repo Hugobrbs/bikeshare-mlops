@@ -55,7 +55,6 @@ def test_replay_is_idempotent(
     assert replay.status_code == 200
     assert replay.json()["status"] == "already_recorded"
     assert len(repository.feedbacks) == 1
-    # chaque tentative HTTP garde sa propre trace
     assert [r.http_status for r in repository.requests if r.endpoint == "/feedback"] == [201, 200]
 
 

@@ -17,11 +17,8 @@ from bikeshare.settings import Settings
 
 
 class FakeRepository:
-    """Même interface que TraceRepository, en mémoire. available=False simule une base arrêtée."""
-
     def __init__(self) -> None:
         self.available = True
-        # erreur SQL qui n'est pas une panne (donnée refusée, contrainte violée)
         self.rejects_writes_with: Exception | None = None
         self.requests: list[RequestTrace] = []
         self.predictions: dict[UUID, PredictionRow] = {}
@@ -76,8 +73,6 @@ class FakeRepository:
 
 
 class HourModel:
-    """Prédit 10 x l'heure : facile à vérifier dans les tests."""
-
     def predict(self, frame: pd.DataFrame) -> np.ndarray:
         return pd.to_datetime(frame["timestamp"]).dt.hour.to_numpy() * 10.0
 

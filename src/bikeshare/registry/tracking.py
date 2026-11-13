@@ -10,12 +10,8 @@ from sklearn.pipeline import Pipeline
 
 from bikeshare.data.schema import INPUT_COLUMNS, TARGET
 
-# mlflow prévient qu'une colonne entière ne peut pas contenir de valeur manquante :
-# sans objet ici, l'API valide les entrées avant le modèle
 warnings.filterwarnings("ignore", message=".*Inferred schema contains integer column.*")
 
-# Le format skops ne charge que les types listés ici (contrairement à pickle,
-# qui exécute n'importe quel code au chargement).
 SKOPS_TRUSTED_TYPES = [
     "bikeshare.features.FeatureBuilder",
     "sklearn.ensemble._hist_gradient_boosting.predictor.TreePredictor",
@@ -34,7 +30,6 @@ class RegisteredVersion:
 
 
 def flatten(report: dict, prefix: str) -> dict[str, float]:
-    """{"mae": 1, "segments": {"night": {"mae": 2}}} -> {"test.mae": 1, "test.night.mae": 2}"""
     flat = {}
     for key, value in report.items():
         if key == "segments":
@@ -46,8 +41,6 @@ def flatten(report: dict, prefix: str) -> dict[str, float]:
 
 
 class TrainingRun:
-    """Run MLflow manipulé par son run_id, sans dépendre du run actif global."""
-
     def __init__(self, client: MlflowClient, run_id: str) -> None:
         self.client = client
         self.run_id = run_id
@@ -92,7 +85,6 @@ class TrainingRun:
         registered_name: str,
         version_tags: dict[str, str] | None = None,
     ) -> RegisteredVersion:
-        # si la publication est rejouée après un échec partiel, on ne crée pas une 2e version
         existing = self.client.search_model_versions(f"run_id='{self.run_id}'")
         if existing:
             version = str(existing[0].version)
@@ -107,11 +99,10 @@ class TrainingRun:
                     input_example=inputs.head(3),
                     skops_trusted_types=SKOPS_TRUSTED_TYPES,
                 )
-            # sortir du with clôt le run, on le rouvre : il reste des choses à journaliser
+            # sortir du with clôt le run, on le rouvre
             self.client.update_run(self.run_id, status="RUNNING")
             version = str(info.registered_model_version)
 
-        # dans les deux cas : l'échec qui a provoqué la relance a pu survenir avant les tags
         for key, value in (version_tags or {}).items():
             self.client.set_model_version_tag(registered_name, version, key, value)
         return RegisteredVersion(registered_name, version, self.run_id)
@@ -125,7 +116,6 @@ def load_model(uri: str) -> Pipeline:
 
 
 def reload_delta(version: RegisteredVersion, model: Pipeline, sample: pd.DataFrame) -> float:
-    """Écart maximal entre le modèle en mémoire et le même modèle rechargé du registre."""
     inputs = sample[list(INPUT_COLUMNS)]
     reloaded = load_model(version.uri)
     return float(np.abs(reloaded.predict(inputs) - model.predict(inputs)).max())

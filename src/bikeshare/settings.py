@@ -7,9 +7,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Configuration lue depuis l'environnement (ou un fichier .env local)."""
-
-    # protected_namespaces : sinon pydantic râle sur les champs model_name / model_alias
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", protected_namespaces=())
 
     environment: str = "local"
@@ -33,19 +30,16 @@ class Settings(BaseSettings):
     ops_db_password: SecretStr | None = None
     grafana_db_password: SecretStr | None = None
 
-    # connexions max à PostgreSQL = api_workers x api_db_pool_max
     api_db_pool_min: int = Field(default=1, ge=1)
     api_db_pool_max: int = Field(default=5, ge=1)
     api_host: str = "127.0.0.1"
     api_port: int = 8001
     api_workers: int = Field(default=1, ge=1)
-    # durée max pendant laquelle un worker peut servir un modèle qui n'est plus le champion
     model_refresh_seconds: float = Field(default=30, gt=0)
     heartbeat_seconds: float = Field(default=15, gt=0)
     admin_token: SecretStr | None = None
 
     pipeline_schedule_seconds: int = Field(default=600, ge=30)
-    # adresse du récepteur d'alertes vue depuis le serveur Prefect
     alert_sink_url: str = "http://localhost:8002/alerts"
     alert_sink_port: int = 8002
     alert_forward_url: SecretStr | None = None

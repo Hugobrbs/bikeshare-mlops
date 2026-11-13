@@ -22,7 +22,6 @@ dataset:
 
 @pytest.fixture
 def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Dossier de données avec un faux hour.csv déjà "téléchargé"."""
     source = tmp_path / "data" / "source" / "hour.csv"
     source.parent.mkdir(parents=True)
     make_source(["2011-01", "2011-02"]).to_csv(source, index=False)
@@ -110,7 +109,6 @@ def test_publish_without_dataset(project: Path) -> None:
 
 
 def test_download_failure_exits_with_error(project: Path) -> None:
-    # le fichier local n'a pas la bonne empreinte et l'URL ne répond pas
     result = runner.invoke(app, ["data", "download"])
 
     assert result.exit_code == 1

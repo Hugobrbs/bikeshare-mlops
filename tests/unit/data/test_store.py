@@ -69,7 +69,6 @@ def test_quarantine_keeps_file_and_report(store: BatchStore, source_file: Path) 
     assert target.parent == store.quarantine_dir
     assert json.loads(target.with_suffix(".report.json").read_text())["failures"] == ["volume"]
     assert store.accepted() == []
-    # un lot rejeté n'est pas "livré" : il sera redéposé
     assert store.delivered_ids() == set()
 
 

@@ -38,8 +38,6 @@ from bikeshare.training import Split, TrainingResult, temporal_split, train
 
 FLOW_NAME = "bikeshare-training"
 
-# pas de cache ni de retry par défaut : chaque étape doit vraiment s'exécuter,
-# et rejouer une étape déterministe qui a planté ne sert à rien
 NO_RETRY = {"retries": 0, "cache_policy": NO_CACHE, "persist_result": False}
 
 
@@ -63,12 +61,10 @@ def retry_if_transient(task: object, task_run: object, state: object) -> bool:
     persist_result=False,
 )
 def acquire(config: PipelineConfig, store: BatchStore) -> list[str]:
-    """Récupère la source puis, si rien n'attend déjà, le ou les prochains lots."""
     logger = get_run_logger()
     snapshot = fetch_source(config.dataset, store.source_dir)
     pending, accepted = store.pending(), store.accepted()
-    # un lot rejeté laisse un trou : on le relivre avant de toucher aux lots suivants déjà
-    # en attente, sinon ils seraient rejetés à leur tour pour rupture de continuité
+    # un lot rejeté laisse un trou : il est relivré avant les lots suivants
     gap = bool(accepted and pending and pending[0].stem != following_month(accepted[-1].batch_id))
     if not pending or gap:
         count = 1 if accepted else config.replay.bootstrap_batches
@@ -125,7 +121,6 @@ def fit(split: Split, config: PipelineConfig) -> TrainingResult:
 
 @task(name="evaluation", **NO_RETRY)
 def assess(result: TrainingResult, split: Split, registry: ModelRegistry) -> Evidence:
-    """Candidat, baseline et champion en place sont mesurés sur le même jeu de test."""
     logger = get_run_logger()
     evidence = Evidence(
         candidate=evaluate(result.model, split.test),
@@ -145,8 +140,6 @@ def assess(result: TrainingResult, split: Split, registry: ModelRegistry) -> Evi
     return evidence
 
 
-# publier deux fois ne crée pas deux versions (voir TrainingRun.log_model),
-# donc on peut réessayer si MLflow a un passage à vide
 @task(
     name="publication",
     retries=2,
@@ -182,7 +175,6 @@ def publish(
     }
     for path, figure in figures.items():
         run.log_figure(figure, path)
-        # le processus vit longtemps : sans ça les figures s'accumulent en mémoire
         close_figure(figure)
 
     version = run.log_model(
@@ -268,8 +260,6 @@ def run_steps(
         f"train-{batch_ids[-1]}",
         {
             "flow_run_id": flow_run_id,
-            # batch_ids : lots arrivés pendant ce run. training_batches : toute la fenêtre
-            # d'entraînement, qui contient aussi des lots acceptés lors de runs précédents
             "batch_ids": ",".join(batch_ids),
             "training_batches": ",".join(
                 r.batch_id for r in store.accepted()[-training.window_months :]
@@ -326,7 +316,6 @@ def run_steps(
 
 @flow(name=FLOW_NAME, retries=0)
 def training_pipeline(config_path: str | None = None) -> dict:
-    """Un cycle complet : nouveau lot, contrôles, entraînement, publication, décision."""
     settings = get_settings()
     config = load_pipeline_config(Path(config_path) if config_path else settings.pipeline_config)
     policy = load_policy(settings.promotion_policy)
@@ -337,7 +326,6 @@ def training_pipeline(config_path: str | None = None) -> dict:
     registry = ModelRegistry(
         MlflowClient(settings.mlflow_tracking_uri), settings.model_name, settings.model_alias
     )
-    # hors d'un run Prefect (appel direct de la fonction), il n'y a pas d'identifiant
     flow_run_id = str(flow_run.id or uuid4())
     watch = Stopwatch()
 
