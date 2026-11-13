@@ -75,7 +75,7 @@ class TraceRepository:
 
     def __init__(self, url: str, min_size: int = 1, max_size: int = 5) -> None:
         self.pool = ConnectionPool(
-            url, min_size=min_size, max_size=max_size, open=False, timeout=5, name="api"
+            url, min_size=min_size, max_size=max_size, open=False, timeout=3, name="api"
         )
 
     def open(self) -> None:
