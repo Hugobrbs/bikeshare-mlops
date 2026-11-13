@@ -16,7 +16,9 @@ app = typer.Typer(
     pretty_exceptions_enable=False,
 )
 data_app = typer.Typer(help="Téléchargement du dataset et rejeu par lots.", no_args_is_help=True)
+registry_app = typer.Typer(help="Registre de modèles (MLflow).", no_args_is_help=True)
 app.add_typer(data_app, name="data")
+app.add_typer(registry_app, name="registry")
 
 
 @app.callback()
@@ -104,3 +106,65 @@ def data_status() -> None:
         "quarantined": sorted(p.name for p in store.quarantine_dir.glob("*.csv")),
     }
     typer.echo(json.dumps(status, indent=2))
+
+
+def make_registry():
+    from mlflow.tracking import MlflowClient
+
+    from bikeshare.registry.models import ModelRegistry
+
+    settings = get_settings()
+    client = MlflowClient(settings.mlflow_tracking_uri)
+    return ModelRegistry(client, settings.model_name, settings.model_alias)
+
+
+@registry_app.command("status")
+def registry_status() -> None:
+    """Liste les versions du modèle, leur statut et leurs alias."""
+    registry = make_registry()
+    versions = registry.client.search_model_versions(f"name='{registry.name}'")
+    rows = [
+        {
+            "version": int(v.version),
+            "status": v.tags.get("validation_status"),
+            "aliases": list(registry.client.get_model_version(registry.name, v.version).aliases),
+            "promoted_at": v.tags.get("promoted_at"),
+            "reasons": v.tags.get("validation_reasons"),
+        }
+        for v in sorted(versions, key=lambda v: int(v.version))
+    ]
+    typer.echo(json.dumps(rows, indent=2, ensure_ascii=False))
+
+
+@registry_app.command("promote")
+def registry_promote(
+    version: str,
+    reason: str = typer.Option(..., help="Pourquoi cette version doit être servie."),
+    actor: str = typer.Option("manuel"),
+) -> None:
+    """Fait d'une version approuvée le nouveau champion."""
+    from bikeshare.registry.models import PromotionRefusedError
+
+    try:
+        change = make_registry().promote(version, actor=actor, reason=reason)
+    except PromotionRefusedError as e:
+        typer.echo(f"refusé : {e}", err=True)
+        raise typer.Exit(1) from e
+    typer.echo(f"champion : v{change.from_version} -> v{change.to_version}")
+
+
+@registry_app.command("rollback")
+def registry_rollback(
+    reason: str = typer.Option(..., help="Pourquoi on revient en arrière."),
+    to_version: str | None = typer.Option(None, help="Par défaut : le champion précédent."),
+    actor: str = typer.Option("manuel"),
+) -> None:
+    """Remet en service le champion précédent (ou une version approuvée précise)."""
+    from bikeshare.registry.models import PromotionRefusedError
+
+    try:
+        change = make_registry().rollback(actor=actor, reason=reason, to_version=to_version)
+    except PromotionRefusedError as e:
+        typer.echo(f"refusé : {e}", err=True)
+        raise typer.Exit(1) from e
+    typer.echo(f"champion : v{change.from_version} -> v{change.to_version}")

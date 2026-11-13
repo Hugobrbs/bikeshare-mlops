@@ -5,7 +5,16 @@ import pytest
 
 from bikeshare.settings import get_settings
 
-ENV_VARS = ("APP_REVISION", "LOG_FORMAT", "LOG_LEVEL", "DATA_DIR", "PIPELINE_CONFIG")
+ENV_VARS = (
+    "APP_REVISION",
+    "LOG_FORMAT",
+    "LOG_LEVEL",
+    "DATA_DIR",
+    "PIPELINE_CONFIG",
+    "MLFLOW_TRACKING_URI",
+    "MODEL_NAME",
+    "MODEL_ALIAS",
+)
 
 
 @pytest.fixture(autouse=True)
