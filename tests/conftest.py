@@ -3,27 +3,16 @@ from collections.abc import Iterator
 
 import pytest
 
-from bikeshare.settings import get_settings
-
-ENV_VARS = (
-    "APP_REVISION",
-    "LOG_FORMAT",
-    "LOG_LEVEL",
-    "DATA_DIR",
-    "PIPELINE_CONFIG",
-    "MLFLOW_TRACKING_URI",
-    "MODEL_NAME",
-    "MODEL_ALIAS",
-)
+from bikeshare.settings import Settings, get_settings
 
 
 @pytest.fixture(autouse=True)
 def clean_environment(
     monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
 ) -> Iterator[None]:
-    for name in ENV_VARS:
-        monkeypatch.delenv(name, raising=False)
-    # pas de .env du poste de dev dans les tests
+    # ni variables du poste de dev, ni .env local
+    for name in Settings.model_fields:
+        monkeypatch.delenv(name.upper(), raising=False)
     monkeypatch.chdir(tmp_path_factory.mktemp("cwd"))
     get_settings.cache_clear()
 

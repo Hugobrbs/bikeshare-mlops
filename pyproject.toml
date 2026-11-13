@@ -13,7 +13,8 @@ dependencies = [
   "numpy==2.2.6",
   "scikit-learn==1.6.1",
   "mlflow==3.17.2",
-  "fastapi>=0.115",
+  # < 0.155 : au-delà le serveur prefect (lancé dans les tests) ne démarre plus
+  "fastapi>=0.115,<0.155",
   "uvicorn[standard]>=0.34",
   "psycopg[binary,pool]>=3.2",
   "pydantic>=2.9",
@@ -27,7 +28,7 @@ dependencies = [
 [project.optional-dependencies]
 # uniquement pour le pipeline d'entraînement, pas installé dans l'image de l'API
 pipeline = [
-  "prefect==3.8.7",
+  "prefect==3.8.8",
   "great-expectations==1.23.2",
   "matplotlib==3.10.3",
 ]
@@ -86,6 +87,7 @@ markers = ["integration: a besoin d'un vrai service (PostgreSQL, Prefect)"]
 filterwarnings = [
   "ignore::DeprecationWarning",
   "ignore::FutureWarning",
+  "ignore::starlette.exceptions.StarletteDeprecationWarning",
 ]
 
 [tool.coverage.run]

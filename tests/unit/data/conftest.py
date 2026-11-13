@@ -14,8 +14,12 @@ def make_source(months: list[str], seed: int = 0) -> pd.DataFrame:
     for month in months:
         hours = pd.date_range(f"{month}-01", periods=pd.Period(month).days_in_month * 24, freq="h")
         n = len(hours)
-        casual = rng.integers(0, 40, n)
-        registered = rng.integers(1, 200, n)
+        # profil horaire + effet de la température : la baseline (moyenne par heure)
+        # ne voit pas le second, un modèle si
+        rush = np.isin(hours.hour, (8, 17, 18)) & (hours.dayofweek < 5)
+        temp = rng.uniform(0.1, 0.9, n).round(2)
+        casual = rng.poisson(5 + hours.hour.to_numpy())
+        registered = rng.poisson(20 + 8 * hours.hour.to_numpy() + 150 * rush + 200 * temp)
         frames.append(
             pd.DataFrame(
                 {
@@ -28,7 +32,7 @@ def make_source(months: list[str], seed: int = 0) -> pd.DataFrame:
                     "weekday": (hours.dayofweek + 1) % 7,
                     "workingday": (hours.dayofweek < 5).astype(int),
                     "weathersit": rng.choice([1, 2, 3], n, p=[0.7, 0.25, 0.05]),
-                    "temp": rng.uniform(0.1, 0.9, n).round(2),
+                    "temp": temp,
                     "atemp": rng.uniform(0.1, 0.9, n).round(4),
                     "hum": rng.uniform(0.2, 1.0, n).round(2),
                     "windspeed": rng.uniform(0.0, 0.5, n).round(4),
