@@ -50,23 +50,3 @@ jobs:
           build-args: APP_REVISION=${{ github.sha }}
           cache-from: type=gha,scope=${{ matrix.target }}
           cache-to: type=gha,scope=${{ matrix.target }},mode=max
-
-  deploy:
-    name: Déployer sur Railway
-    needs: images
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    env:
-      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-    steps:
-      - name: Déploiement désactivé
-        if: env.RAILWAY_TOKEN == ''
-        run: echo "RAILWAY_TOKEN absent, déploiement ignoré"
-      - uses: actions/checkout@v7
-        if: env.RAILWAY_TOKEN != ''
-      - name: Installer la CLI Railway
-        if: env.RAILWAY_TOKEN != ''
-        run: npm install --global @railway/cli
-      - name: Déployer l'API
-        if: env.RAILWAY_TOKEN != ''
-        run: railway up --ci --service api
