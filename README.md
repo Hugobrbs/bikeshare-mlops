@@ -182,10 +182,9 @@ make loadtest            # campagne complète : 3 configurations x 6 paliers
 
 Protocole, mesures et dimensionnement recommandé : [docs/dimensionnement.md](docs/dimensionnement.md).
 
-## CI/CD
+## CI
 
-- **CI** (chaque PR) : ruff, tests unitaires avec un seuil de couverture à 80 %, tests d'intégration (PostgreSQL de service, moteur Prefect), audit des dépendances avec pip-audit, construction des deux images.
-- **CD** (branche `main` et tags `v*`) : les images `api` et `pipeline` sont publiées sur GHCR avec la révision git. Un job déploie ensuite l'API sur Railway (`railway.toml`), uniquement si le secret `RAILWAY_TOKEN` existe. Ce déploiement n'est pas activé : le projet est prévu pour tourner en local.
+Sur chaque PR et sur `main` : ruff, tests unitaires avec un seuil de couverture à 80 %, tests d'intégration (PostgreSQL de service, moteur Prefect), audit des dépendances avec pip-audit, construction des deux images.
 
 ## Documentation
 
