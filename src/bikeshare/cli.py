@@ -167,12 +167,17 @@ def pipeline_start() -> None:
     from bikeshare.pipeline.flow import training_pipeline
     from bikeshare.pipeline.recovery import mark_orphaned_runs
     from bikeshare.pipeline.serve import serve
+    from bikeshare.registry.tracking import close_interrupted_runs
 
+    settings = get_settings()
     try:
-        setup_alerts(get_settings().alert_sink_url)
+        setup_alerts(settings.alert_sink_url)
         orphans = mark_orphaned_runs(make_ops_store())
         if orphans:
             logger.warning("runs interrompus passés en Crashed : %s", orphans)
+            close_interrupted_runs(
+                settings.mlflow_tracking_uri, settings.mlflow_experiment_name, orphans
+            )
     except Exception:
         logger.exception("alertes ou reprise non configurées")
     try:

@@ -111,6 +111,22 @@ class TrainingRun:
         self.client.set_terminated(self.run_id, status=status)
 
 
+def close_interrupted_runs(
+    tracking_uri: str, experiment: str, flow_run_ids: list[str]
+) -> list[str]:
+    client = MlflowClient(tracking_uri)
+    found = client.get_experiment_by_name(experiment)
+    if found is None:
+        return []
+    closed = []
+    for flow_run_id in flow_run_ids:
+        query = f"tags.flow_run_id = '{flow_run_id}' and attributes.status = 'RUNNING'"
+        for run in client.search_runs([found.experiment_id], query):
+            client.set_terminated(run.info.run_id, status="KILLED")
+            closed.append(run.info.run_id)
+    return closed
+
+
 def load_model(uri: str) -> Pipeline:
     return mlflow.sklearn.load_model(uri)
 
