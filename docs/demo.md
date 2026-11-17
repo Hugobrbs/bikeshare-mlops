@@ -16,7 +16,7 @@ Onglets à ouvrir avant de commencer :
 - Swagger : http://localhost:8001/docs
 - Grafana : http://localhost:3000 (admin / `bikeshare-local-admin`), dashboards "Bikeshare - Pipeline" et "Bikeshare - API"
 
-Dans MLflow, fermer le panneau "MLflow Assistant" qui s'ouvre à droite. Dans Grafana, replier le menu latéral : ouvert, il tronque les titres des panneaux et les colonnes des tableaux.
+Dans MLflow, fermer le panneau latéral qui s'ouvre à droite. Dans Grafana, replier le menu latéral : ouvert, il tronque les titres des panneaux et les colonnes des tableaux.
 
 Sur une stack vide, les sept sections se jouent en une dizaine de minutes de commandes.
 
@@ -129,7 +129,7 @@ Une promotion manuelle de cette version est refusée elle aussi (remplacer par l
 docker compose exec pipeline bikeshare registry promote <version quittée> --reason essai
 ```
 
-La commande répond `refusé : version N non servable (validation_status='rolled_back')`. Le refus est le même pour une version rejetée par la politique (`rejected`). En suivant ce scénario depuis une stack vide, le premier candidat rejeté est celui du mois 2011-12 : il n'y en a pas encore à cette étape.
+La commande répond `refusé : version N non servable (validation_status='rolled_back')`. Le refus est le même pour une version rejetée par la politique (`rejected`). En suivant ce scénario depuis une stack vide, le premier candidat rejeté est celui du mois 2011-12, dont la semaine de test est celle de Noël : il n'y en a pas encore à cette étape.
 
 ## 4. Incident : MLflow indisponible
 

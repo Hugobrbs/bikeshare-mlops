@@ -3,7 +3,7 @@ import logging
 import os
 import secrets
 import time
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
@@ -19,7 +19,12 @@ from starlette.exceptions import HTTPException
 
 from bikeshare import __version__
 from bikeshare.api.errors import ApiError, model_unavailable, storage_unavailable
-from bikeshare.api.model_store import LoadedModel, ModelStore
+from bikeshare.api.model_store import (
+    LoadedModel,
+    ModelRefusedError,
+    ModelStore,
+    NoChampionError,
+)
 from bikeshare.api.repository import FeedbackRow, PredictionRow, RequestTrace, TraceRepository
 from bikeshare.api.schemas import (
     BatchPredictRequest,
@@ -53,6 +58,7 @@ indique la version exacte utilisée, et chaque prédiction peut recevoir un feed
 
 Toutes les erreurs ont la même forme :
 `{"request_id": "...", "error": {"code": "...", "message": "..."}}`.
+Seule la sonde `/health/ready` répond 503 avec son propre corps, qui détaille son état.
 """
 
 TAGS = [
@@ -241,7 +247,11 @@ def create_app(
         return response
 
     async def error_response(
-        request: Request, status: int, code: str, message: str
+        request: Request,
+        status: int,
+        code: str,
+        message: str,
+        headers: Mapping[str, str] | None = None,
     ) -> JSONResponse:
         request_id: UUID = getattr(request.state, "request_id", None) or uuid4()
         should_trace = request.url.path in TRACED_ENDPOINTS and hasattr(request.state, "t0")
@@ -262,7 +272,7 @@ def create_app(
         return JSONResponse(
             status_code=status,
             content={"request_id": str(request_id), "error": {"code": code, "message": message}},
-            headers={"X-Request-ID": str(request_id)},
+            headers={**(headers or {}), "X-Request-ID": str(request_id)},
         )
 
     @app.exception_handler(ApiError)
@@ -279,7 +289,7 @@ def create_app(
     @app.exception_handler(HTTPException)
     async def on_http_error(request: Request, error: HTTPException) -> JSONResponse:
         code, message = HTTP_ERRORS.get(error.status_code, ("http_error", str(error.detail)))
-        return await error_response(request, error.status_code, code, message)
+        return await error_response(request, error.status_code, code, message, error.headers)
 
     @app.exception_handler(Exception)
     async def on_unexpected_error(request: Request, error: Exception) -> JSONResponse:
@@ -359,6 +369,7 @@ def create_app(
         tags=["Modèle"],
         responses={
             401: {"model": ErrorResponse, "description": "Jeton absent ou invalide"},
+            409: {"model": ErrorResponse, "description": "Version désignée par l'alias refusée"},
             503: ERRORS[503],
         },
     )
@@ -379,6 +390,12 @@ def create_app(
             raise ApiError(401, "unauthorized", "Jeton d'administration absent ou invalide.")
         try:
             service.models.refresh()
+        except ModelRefusedError as e:
+            raise ApiError(409, "model_refused", str(e)) from e
+        except NoChampionError as e:
+            raise model_unavailable() from e
+        except STORAGE_ERRORS as e:
+            raise storage_unavailable() from e
         except Exception as e:
             raise ApiError(503, "registry_unavailable", "Registre de modèles injoignable.") from e
         return served_model(service)
@@ -401,7 +418,7 @@ def create_app(
             status="ok",
             model_loaded=service.models.current is not None,
             database=service.repository.ping(),
-            registry_reachable=service.models.last_error is None,
+            registry_reachable=service.models.registry_reachable,
             detail=service.models.last_error,
         )
         if not (health.model_loaded and health.database):

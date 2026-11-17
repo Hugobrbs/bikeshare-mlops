@@ -18,7 +18,7 @@ La **capacité soutenable** d'une configuration est le plus grand débit observ�
 | Scénario | `OnlineUser` : prédictions unitaires, 500 observations valides générées avec une graine fixe |
 | Temps de réflexion | 50 à 150 ms entre deux requêtes d'un même utilisateur (environ 10 req/s par utilisateur tant que l'API suit) |
 | Paliers | 5, 10, 20, 40, 80 et 160 utilisateurs simultanés |
-| Durée | 40 s par tir, après une chauffe de 10 s non mesurée |
+| Durée | 40 s par tir. Une chauffe de 10 s à 5 utilisateurs, non mesurée, précède les tirs de chaque configuration |
 | Répétitions | 2 par palier, chacune avec son identifiant de campagne (`X-Test-Campaign`) |
 | Générateur | Locust 2.46.6 sur la machine hôte, 4 processus |
 | Ressources | CPU et mémoire du conteneur relevés en continu avec `docker stats` |
@@ -46,19 +46,22 @@ Reproduire, avec [uv](https://docs.astral.sh/uv/) sur la machine hôte et la sta
 make loadtest
 ```
 
-La commande arrête le pipeline, tire S, M et L sur les six paliers avec deux répétitions (36 tirs), relance le pipeline puis écrit le rapport. Les 18 autres tirs de la campagne (`M0` et les paliers intermédiaires) s'ajoutent au même dossier, `<date>` étant la date du jour au format `AAAA-MM-JJ` :
+La commande arrête le pipeline, tire S, M et L sur les six paliers avec deux répétitions (36 tirs), relance le pipeline puis écrit le rapport dans `loadtests/results/<date du jour>/`.
+
+Pour refaire les 54 tirs de la campagne, `M0` et paliers intermédiaires compris, le pipeline reste arrêté du début à la fin et tous les tirs vont dans le même dossier :
 
 ```sh
 docker compose stop pipeline
-uv run --group loadtest python loadtests/run_campaign.py --name <date> --repeats 2 --configs M0
-uv run --group loadtest python loadtests/run_campaign.py --name <date> --repeats 2 --configs S --levels 15
-uv run --group loadtest python loadtests/run_campaign.py --name <date> --repeats 2 --configs M --levels 30
-uv run --group loadtest python loadtests/run_campaign.py --name <date> --repeats 2 --configs L --levels 60
+uv run --group loadtest python loadtests/run_campaign.py --name complete --repeats 2
+uv run --group loadtest python loadtests/run_campaign.py --name complete --repeats 2 --configs M0
+uv run --group loadtest python loadtests/run_campaign.py --name complete --repeats 2 --configs S --levels 15
+uv run --group loadtest python loadtests/run_campaign.py --name complete --repeats 2 --configs M --levels 30
+uv run --group loadtest python loadtests/run_campaign.py --name complete --repeats 2 --configs L --levels 60
 docker compose up -d pipeline api
-uv run python loadtests/analyze.py loadtests/results/<date>
+uv run python loadtests/analyze.py loadtests/results/complete
 ```
 
-Les fichiers bruts de Locust sont dans `loadtests/results/<date>/raw/`, la synthèse dans `summary.csv` et `report.md`.
+Les fichiers bruts de Locust sont dans le sous-dossier `raw/`, la synthèse dans `summary.csv` et `report.md`.
 
 ## Résultats
 
@@ -115,7 +118,7 @@ Campagne du 12 novembre 2026, 54 tirs. Médiane des deux répétitions de chaque
 
 **L'inférence domine le temps de réponse.** Sur la campagne `S-u10-r1`, côté serveur : p50 de 4,1 ms et p95 de 28,6 ms, dont 26,4 ms dans `model.predict`. Locust mesure un p95 de 37 ms côté client : le réseau local et l'écriture en base ajoutent moins de 10 ms.
 
-**Les threads OpenMP de scikit-learn coûtent plus de la moitié du débit si on les oublie.** Premier passage de M sans réglage (`M0`) : 91 req/s tenus au lieu de 234, avec le CPU à 187 % dès 20 utilisateurs. Par défaut scikit-learn lance autant de threads que de CPU pour chaque prédiction. Pour une seule ligne c'est inutile, et les threads des différents workers se gênent. `OMP_NUM_THREADS=1` est maintenant fixé dans `docker-compose.yml` ; le parallélisme vient des workers.
+**Les threads OpenMP de scikit-learn coûtent plus de la moitié du débit si on les oublie.** Passage de M avec le comportement par défaut de scikit-learn, deux threads par worker (`M0`) : 91 req/s tenus au lieu de 234, avec le CPU à 187 % dès 20 utilisateurs. Par défaut scikit-learn lance autant de threads que de CPU pour chaque prédiction. Pour une seule ligne c'est inutile, et les threads des différents workers se gênent. `OMP_NUM_THREADS=1` est maintenant fixé dans `docker-compose.yml` ; le parallélisme vient des workers.
 
 **Les traces en base recoupent Locust.** Campagne `S-u10-r1` : 3 476 requêtes comptées par Locust, 3 476 lignes dans `tracing.api_requests`. Campagne `L-u40-r1` : 12 515 des deux côtés. Sur un palier saturé (`L-u80-r1`) la base en compte 41 de plus (14 161 contre 14 120) : ce sont les requêtes encore en cours quand Locust s'arrête de compter.
 

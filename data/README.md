@@ -25,7 +25,7 @@ Le dataset est historique et figé. Pour simuler l'arrivée de nouvelles donnée
 | `incoming/` | lots déposés, en attente de validation |
 | `curated/` | lots acceptés, convertis en unités physiques, et `manifest.json` |
 | `quarantine/` | lots rejetés avec leur rapport de validation |
-| `reports/` | rapport de validation de chaque lot accepté |
+| `reports/` | dernier rapport de validation de chaque lot contrôlé, accepté ou non |
 
 ## Colonnes
 

@@ -80,6 +80,7 @@ class HourModel:
 class FakeModelStore:
     def __init__(self) -> None:
         self.last_error: str | None = None
+        self.refusal: type[Exception] | None = None
         self.refreshes = 0
         self.current: LoadedModel | None = LoadedModel(
             model_id=uuid4(),
@@ -91,8 +92,14 @@ class FakeModelStore:
             loaded_at=datetime(2026, 11, 12, tzinfo=UTC),
         )
 
+    @property
+    def registry_reachable(self) -> bool:
+        return self.last_error is None or self.refusal is not None
+
     def refresh(self) -> bool:
         self.refreshes += 1
+        if self.refusal:
+            raise self.refusal(self.last_error)
         if self.last_error:
             raise RuntimeError(self.last_error)
         return False
