@@ -59,7 +59,7 @@ L'API devient prête dans la minute qui suit (`curl localhost:8001/health/ready`
 
 ```sh
 make ps        # état des services
-make logs      # logs du pipeline
+make logs      # logs du pipeline et de l'API
 make down      # arrêt, les volumes sont conservés
 make reset     # arrêt et suppression des volumes, pour repartir de zéro
 ```
@@ -130,7 +130,7 @@ make registry-status     # versions, statut de validation, alias
 make rollback            # remet le champion précédent en service
 ```
 
-La version quittée par un retour arrière est marquée `rolled_back` : elle ne peut plus être servie.
+La version quittée par un retour arrière est marquée `rolled_back` : elle ne peut plus être promue, et l'API refuse de charger une version qui n'est pas approuvée, même si l'alias est déplacé à la main dans MLflow.
 
 ## Démonstration
 
@@ -151,6 +151,7 @@ make install             # environnement verrouillé par uv.lock
 make lint test           # ruff + tests unitaires
 make test-integration    # tests avec un vrai PostgreSQL et le moteur Prefect
 make audit               # vulnérabilités connues des dépendances
+uvx pre-commit install   # facultatif : ruff et contrôles de fichiers avant chaque commit
 ```
 
 ```
