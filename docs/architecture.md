@@ -99,7 +99,7 @@ Les durées sont mesurées avec une horloge monotone. `processing_duration_ms` v
 | `pipeline_writer` | `SELECT`, `INSERT`, `UPDATE` sur `ops` |
 | `grafana_reader` | lecture seule sur les deux schémas, requêtes limitées à 10 secondes |
 
-Le superutilisateur ne sert qu'à `db-init`.
+Le superutilisateur ne sert qu'à `db-init` et au serveur Prefect, pour sa propre base `prefect`.
 
 ## Quel modèle l'API sert-elle ?
 
@@ -121,7 +121,7 @@ Le modèle est sérialisé au format skops plutôt que pickle : au chargement, s
 | Source de données injoignable | 3 nouvelles tentatives espacées, URL de secours, puis échec et alerte. Une erreur définitive (404, mauvaise empreinte) n'est pas retentée |
 | Lot invalide | quarantaine avec rapport, exécution en échec, alerte, pas d'entraînement. Le champion reste servi. Le lot est relivré au cycle suivant, avant les lots suivants déjà en attente. Un fichier illisible ou mal nommé est traité de la même façon |
 | Modèle moins bon que la baseline ou que le champion | version marquée `rejected` ou non promue. Ce n'est pas une panne : l'exécution est `Completed`, sans alerte |
-| Alias `champion` déplacé à la main sur une version non approuvée | l'API refuse de la charger et garde le modèle en mémoire. `/health/ready` donne la raison dans `detail` |
+| Alias `champion` déplacé à la main sur une version non approuvée | l'API refuse de la charger et garde le modèle en mémoire. `/health/ready` donne la raison dans `detail` et `POST /admin/model/refresh` répond 409 |
 | MLflow arrêté | le flow échoue en quelques secondes (les tentatives du client MLflow sont bornées) avec alerte. Le lot déjà validé reste accepté et servira à l'entraînement suivant. L'API continue avec le modèle en mémoire ; un worker qui redémarre pendant la panne reste non prêt jusqu'au retour de MLflow |
 | PostgreSQL arrêté | l'API répond 503 en une seconde au plus (jamais de prédiction sans trace), `/health/ready` passe à 503, `/health/live` reste à 200 et l'erreur est journalisée avec son `request_id`. Reprise automatique quelques secondes après le retour de la base |
 | Conteneur du pipeline tué en plein run | Prefect ne s'en aperçoit pas seul : le run reste `Running`. Au redémarrage, le conteneur passe ces runs en `Crashed`, ce qui déclenche l'alerte, et clôt leur run MLflow resté ouvert (`KILLED`) |

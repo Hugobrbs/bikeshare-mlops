@@ -84,7 +84,7 @@ Tout ce qui suit a été observé sur la stack Docker complète, démarrée à v
 | MLflow arrêté | l'API continue de prédire (`registry_reachable: false`). Un run lancé pendant la panne échoue en 5 secondes, avec alerte |
 | PostgreSQL arrêté | `/health/ready` et `/predict` répondent 503 (tout de suite pour la première requête, puis après une seconde d'attente d'une connexion), `/health/live` reste à 200, erreur journalisée avec son `request_id`. API de nouveau prête 6 secondes après le redémarrage de la base |
 | Conteneur du pipeline tué en plein run | au redémarrage, le run resté `Running` passe en `Crashed`, l'alerte arrive dans la seconde et le run MLflow resté ouvert est clos (`KILLED`) |
-| Valeurs réelles renvoyées en feedback | 150 heures d'octobre 2011 prédites par la v3 puis comparées au réel : MAE observée de 33,9, affichée dans Grafana |
+| Valeurs réelles renvoyées en feedback | 200 heures d'octobre 2011 prédites par la v2 puis comparées au réel : MAE observée de 29,0, affichée dans Grafana |
 
 Les tests automatisés couvrent la logique de ces scénarios :
 
@@ -133,7 +133,7 @@ Trois configurations du conteneur de l'API, de 5 à 160 utilisateurs simultanés
 - Sans `OMP_NUM_THREADS=1`, la configuration M ne tient que 91 req/s au lieu de 234.
 - Les totaux de Locust recoupent les lignes de `tracing.api_requests` (3 476 des deux côtés sur une campagne).
 
-**Recommandation** : des pods de 1 vCPU et 512 Mo avec un worker, comptés à 85 req/s chacun (environ 70 % de la capacité mesurée), plus un pod de réserve. Soit 3 pods pour un pic de 150 req/s. Mise à l'échelle automatique à 60 % de CPU, entre 2 et 8 pods. Le nombre de pods suppose que leurs capacités s'additionnent : la campagne ne mesure qu'un conteneur à la fois.
+**Recommandation** : des pods de 1 vCPU et 512 Mo (219 Mo mesurés au plus, cette limite n'a pas été tirée telle quelle) avec un worker, comptés à 85 req/s chacun (environ 70 % de la capacité mesurée), plus un pod de réserve. Soit 3 pods pour un pic de 150 req/s. Mise à l'échelle automatique à 60 % de CPU, entre 2 et 8 pods. Le nombre de pods suppose que leurs capacités s'additionnent : la campagne ne mesure qu'un conteneur à la fois.
 
 ## Limites connues
 

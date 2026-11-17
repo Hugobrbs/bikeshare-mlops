@@ -55,7 +55,7 @@ make up
 2. ingère les six premiers mois (2011-01 à 2011-06) après contrôle qualité ;
 3. entraîne un premier modèle, l'enregistre dans MLflow et le promeut `champion`.
 
-L'API devient prête dans la minute qui suit (`curl localhost:8001/health/ready`). Ensuite le déploiement Prefect rejoue un nouveau mois toutes les 10 minutes (`PIPELINE_SCHEDULE_SECONDS`), ou tout de suite avec `make train`.
+Une fois les images construites, l'API est prête environ une minute et demie après `make up` (`curl localhost:8001/health/ready`). Ensuite le déploiement Prefect rejoue un nouveau mois toutes les 10 minutes (`PIPELINE_SCHEDULE_SECONDS`), ou tout de suite avec `make train`.
 
 ```sh
 make ps        # état des services
@@ -127,7 +127,7 @@ Le modèle servi est celui que désigne l'alias `champion` dans MLflow. L'API re
 
 ```sh
 make registry-status     # versions, statut de validation, alias
-make rollback            # remet le champion précédent en service
+make rollback            # remet le champion précédent en service, refusé s'il n'y en a pas
 ```
 
 La version quittée par un retour arrière est marquée `rolled_back` : elle ne peut plus être promue, et l'API refuse de charger une version qui n'est pas approuvée, même si l'alias est déplacé à la main dans MLflow.
