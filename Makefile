@@ -30,7 +30,7 @@ test: ## Lance les tests unitaires
 test-integration: ## Lance les tests d'intégration sur un PostgreSQL jetable
 	docker run -d --rm --name bikeshare-test-pg -p 127.0.0.1:55432:5432 \
 		-e POSTGRES_PASSWORD=test -e POSTGRES_DB=bikeshare_test postgres:18.6-bookworm
-	until docker exec bikeshare-test-pg pg_isready -q -U postgres; do sleep 1; done
+	until docker exec bikeshare-test-pg pg_isready -q -h 127.0.0.1 -U postgres; do sleep 1; done
 	TEST_ADMIN_DATABASE_URL=$(TEST_DB) uv run pytest -m integration; \
 		status=$$?; docker stop bikeshare-test-pg; exit $$status
 
