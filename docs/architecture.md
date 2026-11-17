@@ -105,7 +105,7 @@ Le superutilisateur ne sert qu'à `db-init`.
 
 L'API ne connaît ni chemin de fichier ni numéro de version : elle suit l'alias `champion` du registre.
 
-- Au démarrage, chaque worker résout l'alias, vérifie que la version a été entraînée avec la même version des features (`feature_version`), charge le modèle et enregistre son identité dans `tracing.model_versions`.
+- Au démarrage, chaque worker résout l'alias, vérifie que la version est approuvée par la politique (`validation_status`) et qu'elle a été entraînée avec la même version des features (`feature_version`), charge le modèle et enregistre son identité dans `tracing.model_versions`.
 - Toutes les 30 secondes (`MODEL_REFRESH_SECONDS`), il relit l'alias. Si la version a changé, le nouveau modèle est chargé puis remplace l'ancien d'un coup ; l'ancien sert jusqu'à ce moment.
 - Si MLflow ne répond pas, le modèle en mémoire continue de servir.
 - `POST /admin/model/refresh` force la relecture sur le worker qui reçoit l'appel.
@@ -121,6 +121,7 @@ Le modèle est sérialisé au format skops plutôt que pickle : au chargement, s
 | Source de données injoignable | 3 nouvelles tentatives espacées, URL de secours, puis échec et alerte. Une erreur définitive (404, mauvaise empreinte) n'est pas retentée |
 | Lot invalide | quarantaine avec rapport, exécution en échec, alerte, pas d'entraînement. Le champion reste servi. Le lot est relivré au cycle suivant, avant les lots suivants déjà en attente. Un fichier illisible ou mal nommé est traité de la même façon |
 | Modèle moins bon que la baseline ou que le champion | version marquée `rejected` ou non promue. Ce n'est pas une panne : l'exécution est `Completed`, sans alerte |
+| Alias `champion` déplacé à la main sur une version non approuvée | l'API refuse de la charger et garde le modèle en mémoire. `/health/ready` donne la raison dans `detail` |
 | MLflow arrêté | le flow échoue en quelques secondes (les tentatives du client MLflow sont bornées) avec alerte. Le lot déjà validé reste accepté et servira à l'entraînement suivant. L'API continue avec le modèle en mémoire ; un worker qui redémarre pendant la panne reste non prêt jusqu'au retour de MLflow |
 | PostgreSQL arrêté | l'API répond 503 en une seconde au plus (jamais de prédiction sans trace), `/health/ready` passe à 503, `/health/live` reste à 200 et l'erreur est journalisée avec son `request_id`. Reprise automatique quelques secondes après le retour de la base |
 | Conteneur du pipeline tué en plein run | Prefect ne s'en aperçoit pas seul : le run reste `Running`. Au redémarrage, le conteneur passe ces runs en `Crashed`, ce qui déclenche l'alerte, et clôt leur run MLflow resté ouvert (`KILLED`) |

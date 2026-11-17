@@ -30,7 +30,7 @@ def test_clean_batch_passes(january: pd.DataFrame) -> None:
     assert report.success
     assert report.failures == []
     assert report.rows == 744
-    assert report.checks > 30
+    assert report.checks == 42
 
 
 @pytest.mark.parametrize(

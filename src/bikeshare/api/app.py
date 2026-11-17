@@ -15,6 +15,7 @@ from fastapi import Depends, FastAPI, Header, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
+from starlette.exceptions import HTTPException
 
 from bikeshare import __version__
 from bikeshare.api.errors import ApiError, model_unavailable, storage_unavailable
@@ -64,6 +65,11 @@ TAGS = [
 ERRORS = {
     422: {"model": ErrorResponse, "description": "Entrée invalide"},
     503: {"model": ErrorResponse, "description": "Modèle ou stockage indisponible"},
+}
+
+HTTP_ERRORS = {
+    404: ("not_found", "Route inconnue."),
+    405: ("method_not_allowed", "Méthode non autorisée pour cette route."),
 }
 
 
@@ -269,6 +275,11 @@ def create_app(
             f"{'.'.join(str(part) for part in e['loc'][1:])} : {e['msg']}" for e in error.errors()
         ]
         return await error_response(request, 422, "invalid_input", " ; ".join(problems[:5]))
+
+    @app.exception_handler(HTTPException)
+    async def on_http_error(request: Request, error: HTTPException) -> JSONResponse:
+        code, message = HTTP_ERRORS.get(error.status_code, ("http_error", str(error.detail)))
+        return await error_response(request, error.status_code, code, message)
 
     @app.exception_handler(Exception)
     async def on_unexpected_error(request: Request, error: Exception) -> JSONResponse:

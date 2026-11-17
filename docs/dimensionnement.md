@@ -40,10 +40,21 @@ Trois configurations du conteneur de l'API, appliquées avec les limites de ress
 
 Machine : Apple M5 (10 coeurs, 24 Go), Docker Desktop limité à 10 CPU et 8 Go. Locust, PostgreSQL, MLflow, Prefect et l'API partagent les mêmes coeurs.
 
-Reproduire :
+Reproduire, avec [uv](https://docs.astral.sh/uv/) sur la machine hôte et la stack démarrée :
 
 ```sh
 make loadtest
+```
+
+La commande arrête le pipeline, tire S, M et L sur les six paliers avec deux répétitions (36 tirs), relance le pipeline puis écrit le rapport. Les 18 autres tirs de la campagne (`M0` et les paliers intermédiaires) s'ajoutent au même dossier, `<date>` étant la date du jour au format `AAAA-MM-JJ` :
+
+```sh
+docker compose stop pipeline
+uv run --group loadtest python loadtests/run_campaign.py --name <date> --repeats 2 --configs M0
+uv run --group loadtest python loadtests/run_campaign.py --name <date> --repeats 2 --configs S --levels 15
+uv run --group loadtest python loadtests/run_campaign.py --name <date> --repeats 2 --configs M --levels 30
+uv run --group loadtest python loadtests/run_campaign.py --name <date> --repeats 2 --configs L --levels 60
+docker compose up -d pipeline api
 uv run python loadtests/analyze.py loadtests/results/<date>
 ```
 
@@ -90,7 +101,7 @@ Campagne du 12 novembre 2026, 54 tirs. Médiane des deux répétitions de chaque
 | M0 | 91 | 10 utilisateurs | 20 | 46 |
 | L | 324 | 40 utilisateurs | 99 | 81 |
 
-`M0` est la configuration M sans `OMP_NUM_THREADS=1` (voir plus bas). CPU moyen : 100 % = un coeur.
+`M0` est la configuration M avec deux threads OpenMP par worker (`OMP_NUM_THREADS=2`), ce que scikit-learn fait de lui-même sur 2 CPU quand rien n'est réglé (voir plus bas). CPU moyen : 100 % = un coeur.
 
 ## Lecture des résultats
 
@@ -100,7 +111,7 @@ Campagne du 12 novembre 2026, 54 tirs. Médiane des deux répétitions de chaque
 
 **Le débit par CPU baisse quand la configuration grossit.** 124 req/s par CPU pour S, 117 pour M, 81 pour L. Pour L la mesure est une borne basse : avec 4 coeurs pour l'API, 4 processus Locust et PostgreSQL, les 10 coeurs de la machine sont occupés et le générateur de charge gêne ce qu'il mesure.
 
-**La mémoire est proportionnelle au nombre de workers** : environ 215 Mo par worker (219 Mo pour S, 489 pour M, 868 pour L), quel que soit le palier. Chaque worker charge son propre modèle.
+**La mémoire est proportionnelle au nombre de workers** : entre 215 et 245 Mo par worker (219 Mo pour S, 489 pour M, 868 pour L), quel que soit le palier. Chaque worker charge son propre modèle.
 
 **L'inférence domine le temps de réponse.** Sur la campagne `S-u10-r1`, côté serveur : p50 de 4,1 ms et p95 de 28,6 ms, dont 26,4 ms dans `model.predict`. Locust mesure un p95 de 37 ms côté client : le réseau local et l'écriture en base ajoutent moins de 10 ms.
 
@@ -113,8 +124,8 @@ Campagne du 12 novembre 2026, 54 tirs. Médiane des deux répétitions de chaque
 **Un pod = 1 vCPU, 512 Mo, 1 worker uvicorn, `OMP_NUM_THREADS=1`, 5 connexions PostgreSQL.**
 
 - 1 vCPU et 1 worker : c'est la configuration qui rend le plus par CPU (124 req/s contre 117 et 81).
-- 512 Mo : 219 Mo observés au maximum. La marge couvre le chargement d'un nouveau modèle à côté de l'ancien pendant un changement de champion.
-- Capacité retenue : **85 req/s par pod**, soit 70 % des 124 req/s mesurés. A ce débit le CPU est autour de 40 % et le p95 sous 40 ms.
+- 512 Mo : 219 Mo observés au maximum. La marge couvre le chargement d'un nouveau modèle à côté de l'ancien pendant un changement de champion. Cette limite n'a pas été tirée telle quelle : S a été mesurée avec 768 Mo, jamais approchés.
+- Capacité retenue : **85 req/s par pod**, soit environ 70 % des 124 req/s mesurés. A ce débit le CPU est autour de 40 % et le p95 sous 40 ms.
 
 Nombre de pods = pic attendu / 85, arrondi au supérieur, plus un pod de réserve :
 
@@ -137,7 +148,7 @@ Sans orchestrateur, sur une seule machine avec Docker Compose, la configuration 
 API_WORKERS=2 API_CPUS=2.0 API_MEMORY=1280M docker compose up -d api
 ```
 
-Ce qui n'a pas été mesuré : le comportement d'un autoscaler sous une salve brutale (il n'y en a pas en local), et la charge côté PostgreSQL, qui deviendra le facteur limitant avant l'API si on multiplie les pods.
+Ce qui n'a pas été mesuré : plusieurs pods derrière un répartiteur (le nombre de pods ci-dessus suppose que leurs capacités s'additionnent, la campagne ne tire que sur un conteneur à la fois), le comportement d'un autoscaler sous une salve brutale (il n'y en a pas en local), et la charge côté PostgreSQL, qui deviendra le facteur limitant avant l'API si on multiplie les pods.
 
 ## Limites
 

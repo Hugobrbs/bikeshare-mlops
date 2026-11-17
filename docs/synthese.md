@@ -21,7 +21,7 @@ Le dataset est historique. Il est rejoué mois par mois pour simuler un flux : c
 | Persistance | PostgreSQL, trois comptes à droits minimaux | l'API ne peut qu'ajouter des traces, Grafana ne peut que lire |
 | Alertes | automation côté serveur Prefect vers un webhook | un retry réussi ne déclenche rien, et l'alerte ne dépend pas du processus du flow |
 | Supervision | Grafana sur PostgreSQL, dashboards provisionnés | pas de Prometheus à opérer pour ce périmètre, dashboards versionnés avec le code |
-| Charge | Locust, script de campagne | mêmes scénarios à chaque tir, résultats bruts conservés |
+| Charge | Locust, script de campagne | mêmes scénarios à chaque tir, fichiers de résultats de Locust conservés |
 
 ### Ce que les essais ont fait changer
 
@@ -73,11 +73,12 @@ Tout ce qui suit a été observé sur la stack Docker complète, démarrée à v
 | Scénario | Résultat observé |
 |---|---|
 | Premier démarrage | 6 lots acceptés, modèle v1 (MAE 21,8 contre 93,8 pour la baseline) promu, API prête quelques secondes après sans redémarrage |
-| Clone neuf dans un dossier vide | stack démarrée sur d'autres ports à côté de la première : API prête en moins d'une minute (images déjà construites), même modèle v1 et même MAE de 21,8 |
+| Clone neuf du dépôt | `make up` avec le `.env.example` tel quel : API prête en 81 secondes (images déjà construites), même modèle v1 et même MAE de 21,8 |
 | Exécution planifiée | lot 2011-07 accepté, v2 (MAE 18,6) promue car meilleure que la v1 sur le même test (21,4) |
 | Lot tronqué, valeurs négatives ou capteur figé | exécution `Failed` à l'étape de validation, lot en quarantaine, aucun run MLflow, aucune nouvelle version, alerte en base une à deux secondes après, champion inchangé |
 | Reprise après lot invalide | au cycle suivant le lot est relivré propre et accepté, sans intervention |
 | Retour arrière | `bikeshare registry rollback` : alias de la v2 vers la v1, l'API sert la v1 5 secondes plus tard. La version quittée est marquée `rolled_back` et ne peut plus être servie |
+| Alias déplacé à la main sur la version quittée | l'API refuse de la charger (`version 4 non servable`), continue de servir le champion précédent et donne la raison dans `/health/ready` |
 | Feedback rejoué | 201 puis 200, une seule ligne. 8 envois simultanés identiques : un seul créé |
 | Entrée invalide | 422 avec `request_id`, tracée en base avec son code d'erreur, aucune prédiction enregistrée |
 | MLflow arrêté | l'API continue de prédire (`registry_reachable: false`). Un run lancé pendant la panne échoue en 5 secondes, avec alerte |
@@ -85,12 +86,14 @@ Tout ce qui suit a été observé sur la stack Docker complète, démarrée à v
 | Conteneur du pipeline tué en plein run | au redémarrage, le run resté `Running` passe en `Crashed`, l'alerte arrive dans la seconde et le run MLflow resté ouvert est clos (`KILLED`) |
 | Valeurs réelles renvoyées en feedback | 150 heures d'octobre 2011 prédites par la v3 puis comparées au réel : MAE observée de 33,9, affichée dans Grafana |
 
-Les mêmes scénarios sont couverts par les tests automatisés :
+Les tests automatisés couvrent la logique de ces scénarios :
 
-- tests unitaires : logique métier, API avec une base et un modèle simulés ;
-- tests d'intégration : vrai PostgreSQL (transactions, droits des comptes, feedbacks concurrents), vrai moteur Prefect et vrai MLflow sur le flow complet (premier entraînement, mois suivant, lot invalide puis reprise, source épuisée).
+- tests unitaires : logique métier, API avec une base et un modèle simulés (base arrêtée, registre injoignable, feedback rejoué, entrée invalide) ;
+- tests d'intégration : vrai PostgreSQL (transactions, droits des comptes, feedbacks concurrents), moteur Prefect et MLflow sur une base SQLite locale pour le flow complet (premier entraînement, mois suivant, lot invalide puis reprise, source épuisée), run orphelin passé en `Crashed`.
 
 La CI lance les deux niveaux sur chaque PR, avec l'audit des dépendances et la construction des images.
+
+Ce qui dépend des conteneurs ne se vérifie qu'avec le scénario de [demo.md](demo.md) : l'alerte de bout en bout (automation Prefect, webhook, ligne dans `ops.alerts`), l'arrêt de MLflow ou de PostgreSQL et le pipeline tué en plein run.
 
 ## Ce que le rejeu des 24 mois a montré
 
@@ -126,11 +129,11 @@ Trois configurations du conteneur de l'API, de 5 à 160 utilisateurs simultanés
 | L : 4 CPU, 4 workers | 324 req/s | 99 ms | 81 req/s | 868 Mo |
 
 - Aucun échec sur les 54 tirs : en surcharge l'API ralentit mais ne tombe pas.
-- La mémoire dépend du nombre de workers (environ 215 Mo chacun), pas de la charge.
+- La mémoire dépend du nombre de workers (entre 215 et 245 Mo chacun), pas de la charge.
 - Sans `OMP_NUM_THREADS=1`, la configuration M ne tient que 91 req/s au lieu de 234.
 - Les totaux de Locust recoupent les lignes de `tracing.api_requests` (3 476 des deux côtés sur une campagne).
 
-**Recommandation** : des pods de 1 vCPU et 512 Mo avec un worker, comptés à 85 req/s chacun (70 % de la capacité mesurée), plus un pod de réserve. Soit 3 pods pour un pic de 150 req/s. Mise à l'échelle automatique à 60 % de CPU, entre 2 et 8 pods.
+**Recommandation** : des pods de 1 vCPU et 512 Mo avec un worker, comptés à 85 req/s chacun (environ 70 % de la capacité mesurée), plus un pod de réserve. Soit 3 pods pour un pic de 150 req/s. Mise à l'échelle automatique à 60 % de CPU, entre 2 et 8 pods. Le nombre de pods suppose que leurs capacités s'additionnent : la campagne ne mesure qu'un conteneur à la fois.
 
 ## Limites connues
 

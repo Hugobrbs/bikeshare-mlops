@@ -49,7 +49,7 @@ cd bikeshare-mlops
 make up
 ```
 
-`make up` crée `.env` à partir de `.env.example`, construit les images et démarre tout. Au premier lancement le pipeline :
+`make up` crée `.env` à partir de `.env.example`, construit les images en y inscrivant le commit courant et démarre tout. Au premier lancement le pipeline :
 
 1. télécharge le dataset depuis l'UCI et vérifie son empreinte ;
 2. ingère les six premiers mois (2011-01 à 2011-06) après contrôle qualité ;
@@ -59,7 +59,7 @@ L'API devient prête dans la minute qui suit (`curl localhost:8001/health/ready`
 
 ```sh
 make ps        # état des services
-make logs      # logs du pipeline
+make logs      # logs du pipeline et de l'API
 make down      # arrêt, les volumes sont conservés
 make reset     # arrêt et suppression des volumes, pour repartir de zéro
 ```
@@ -130,7 +130,7 @@ make registry-status     # versions, statut de validation, alias
 make rollback            # remet le champion précédent en service
 ```
 
-La version quittée par un retour arrière est marquée `rolled_back` : elle ne peut plus être servie.
+La version quittée par un retour arrière est marquée `rolled_back` : elle ne peut plus être promue, et l'API refuse de charger une version qui n'est pas approuvée, même si l'alias est déplacé à la main dans MLflow.
 
 ## Démonstration
 
@@ -151,6 +151,7 @@ make install             # environnement verrouillé par uv.lock
 make lint test           # ruff + tests unitaires
 make test-integration    # tests avec un vrai PostgreSQL et le moteur Prefect
 make audit               # vulnérabilités connues des dépendances
+uvx pre-commit install   # facultatif : ruff et contrôles de fichiers avant chaque commit
 ```
 
 ```
@@ -174,6 +175,8 @@ tests/         unit/ et integration/
 La configuration d'exécution (adresses, mots de passe, cadence) vient de l'environnement, voir `.env.example`. Les paramètres du traitement (source, seuils qualité, hyperparamètres) sont dans `config/pipeline.yaml`.
 
 ## Tests de charge
+
+Locust tourne sur la machine hôte : il faut uv, qui installe Locust au premier lancement.
 
 ```sh
 make loadtest-ui         # interface Locust sur http://localhost:8089

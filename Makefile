@@ -6,6 +6,9 @@
 PIPELINE = docker compose exec pipeline
 TEST_DB = postgresql://postgres:test@127.0.0.1:55432/bikeshare_test
 
+APP_REVISION ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo dev)
+export APP_REVISION
+
 help: ## Affiche cette aide
 	@grep -hE '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*## "} {printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}'
@@ -44,7 +47,7 @@ clean: ## Supprime les caches et fichiers générés par les outils
 	rm -rf .pytest_cache .ruff_cache .coverage coverage.xml htmlcov
 	find . -name __pycache__ -type d -not -path "./.venv/*" -exec rm -rf {} +
 
-up: ## Démarre toute la stack (crée .env à partir de .env.example si besoin)
+up: ## Démarre toute la stack (crée .env si besoin, inscrit le commit courant dans les images)
 	@test -f .env || cp .env.example .env
 	docker compose up -d --build
 
@@ -87,10 +90,10 @@ rollback: ## Remet en service le champion précédent
 	$(PIPELINE) bikeshare registry rollback --reason "retour arrière manuel"
 
 loadtest-ui: ## Interface Locust sur http://localhost:8089
-	uv run locust -f loadtests/locustfile.py MixedUser --host http://localhost:8001
+	uv run --group loadtest locust -f loadtests/locustfile.py MixedUser --host http://localhost:8001
 
 loadtest: ## Campagne de charge complète (S, M, L) puis rapport : environ 30 minutes
 	docker compose stop pipeline
-	uv run python loadtests/run_campaign.py --name $$(date +%Y-%m-%d) --repeats 2; \
+	uv run --group loadtest python loadtests/run_campaign.py --name $$(date +%Y-%m-%d) --repeats 2; \
 		status=$$?; docker compose up -d pipeline api; exit $$status
 	uv run python loadtests/analyze.py loadtests/results/$$(date +%Y-%m-%d)

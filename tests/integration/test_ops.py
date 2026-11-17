@@ -93,5 +93,7 @@ def test_unreachable_database_never_raises(caplog: pytest.LogCaptureFixture) -> 
     assert "suivi ops non enregistré" in caplog.text
 
 
-def test_disabled_without_url() -> None:
+def test_disabled_without_url(caplog: pytest.LogCaptureFixture) -> None:
     OpsStore(None).alert_received("sujet", "corps", forwarded=False)
+
+    assert "suivi ops non enregistré" not in caplog.text
