@@ -7,7 +7,12 @@ import pytest
 from mlflow.exceptions import MlflowException
 from mlflow.tracking import MlflowClient
 
-from bikeshare.api.model_store import IncompatibleModelError, ModelStore, UnapprovedModelError
+from bikeshare.api.model_store import (
+    IncompatibleModelError,
+    ModelStore,
+    NoChampionError,
+    UnapprovedModelError,
+)
 from bikeshare.data.schema import INPUT_COLUMNS
 from bikeshare.pipeline_config import ModelConfig, TrainingConfig
 from bikeshare.registry.tracking import RegisteredVersion, TrainingRun
@@ -101,11 +106,12 @@ def test_follows_promotion_and_rollback(
 def test_no_champion_yet(tracking_uri: str) -> None:
     store, _ = make_store(tracking_uri)
 
-    with pytest.raises(MlflowException):
+    with pytest.raises(NoChampionError):
         store.refresh()
 
     assert store.current is None
-    assert "MlflowException" in store.last_error or "RestException" in store.last_error
+    assert "NoChampionError" in store.last_error
+    assert store.registry_reachable is True
 
 
 def test_model_trained_with_other_features_is_refused(
@@ -123,6 +129,7 @@ def test_model_trained_with_other_features_is_refused(
 
     assert store.current.version == 1
     assert "IncompatibleModelError" in store.last_error
+    assert store.registry_reachable is True
 
 
 @pytest.mark.parametrize("status", ["rejected", "rolled_back", None])
@@ -157,6 +164,7 @@ def test_unapproved_champion_is_not_loaded_at_startup(
 
     assert store.current is None
     assert registered == []
+    assert store.registry_reachable is True
 
 
 def test_served_version_losing_its_approval_is_reported(
@@ -200,3 +208,8 @@ def test_registry_outage_keeps_the_loaded_model(
     assert store.current.version == 1
     assert store.last_error is not None
     assert store.registry_reachable is False
+
+    store.client = registry
+    assert store.refresh() is False
+    assert store.last_error is None
+    assert store.registry_reachable is True

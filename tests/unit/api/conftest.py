@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 from bikeshare.api.app import create_app
 from bikeshare.api.errors import feedback_conflict, prediction_not_found
-from bikeshare.api.model_store import LoadedModel, UnapprovedModelError
+from bikeshare.api.model_store import LoadedModel
 from bikeshare.api.repository import FeedbackRow, PredictionRow, RequestTrace
 from bikeshare.settings import Settings
 
@@ -80,7 +80,7 @@ class HourModel:
 class FakeModelStore:
     def __init__(self) -> None:
         self.last_error: str | None = None
-        self.refused = False
+        self.refusal: type[Exception] | None = None
         self.refreshes = 0
         self.current: LoadedModel | None = LoadedModel(
             model_id=uuid4(),
@@ -94,12 +94,12 @@ class FakeModelStore:
 
     @property
     def registry_reachable(self) -> bool:
-        return self.last_error is None or self.refused
+        return self.last_error is None or self.refusal is not None
 
     def refresh(self) -> bool:
         self.refreshes += 1
-        if self.refused:
-            raise UnapprovedModelError(self.last_error)
+        if self.refusal:
+            raise self.refusal(self.last_error)
         if self.last_error:
             raise RuntimeError(self.last_error)
         return False

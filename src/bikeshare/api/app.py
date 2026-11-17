@@ -19,7 +19,12 @@ from starlette.exceptions import HTTPException
 
 from bikeshare import __version__
 from bikeshare.api.errors import ApiError, model_unavailable, storage_unavailable
-from bikeshare.api.model_store import LoadedModel, ModelRefusedError, ModelStore
+from bikeshare.api.model_store import (
+    LoadedModel,
+    ModelRefusedError,
+    ModelStore,
+    NoChampionError,
+)
 from bikeshare.api.repository import FeedbackRow, PredictionRow, RequestTrace, TraceRepository
 from bikeshare.api.schemas import (
     BatchPredictRequest,
@@ -387,6 +392,10 @@ def create_app(
             service.models.refresh()
         except ModelRefusedError as e:
             raise ApiError(409, "model_refused", str(e)) from e
+        except NoChampionError as e:
+            raise model_unavailable() from e
+        except STORAGE_ERRORS as e:
+            raise storage_unavailable() from e
         except Exception as e:
             raise ApiError(503, "registry_unavailable", "Registre de modèles injoignable.") from e
         return served_model(service)

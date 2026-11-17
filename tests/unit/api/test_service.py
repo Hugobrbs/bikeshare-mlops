@@ -1,5 +1,12 @@
+import psycopg
+import pytest
 from fastapi.testclient import TestClient
 
+from bikeshare.api.model_store import (
+    IncompatibleModelError,
+    NoChampionError,
+    UnapprovedModelError,
+)
 from tests.unit.api.conftest import FakeModelStore, FakeRepository
 
 
@@ -87,11 +94,12 @@ def test_refresh_when_registry_is_down(client: TestClient, models: FakeModelStor
     assert response.json()["error"]["code"] == "registry_unavailable"
 
 
+@pytest.mark.parametrize("refusal", [UnapprovedModelError, IncompatibleModelError])
 def test_refused_champion_is_not_reported_as_a_registry_outage(
-    client: TestClient, models: FakeModelStore
+    client: TestClient, models: FakeModelStore, refusal: type[Exception]
 ) -> None:
     models.last_error = "version 4 non servable (validation_status='rolled_back')"
-    models.refused = True
+    models.refusal = refusal
 
     ready = client.get("/health/ready")
     refresh = client.post("/admin/model/refresh", headers={"X-Admin-Token": "jeton-de-test"})
@@ -102,6 +110,34 @@ def test_refused_champion_is_not_reported_as_a_registry_outage(
     assert refresh.status_code == 409
     assert refresh.json()["error"]["code"] == "model_refused"
     assert "non servable" in refresh.json()["error"]["message"]
+
+
+def test_refresh_without_any_champion_is_not_a_registry_outage(
+    client: TestClient, models: FakeModelStore
+) -> None:
+    models.current = None
+    models.last_error = "aucune version de bikeshare-demand ne porte l'alias champion"
+    models.refusal = NoChampionError
+
+    ready = client.get("/health/ready")
+    refresh = client.post("/admin/model/refresh", headers={"X-Admin-Token": "jeton-de-test"})
+
+    assert ready.status_code == 503
+    assert ready.json()["registry_reachable"] is True
+    assert refresh.status_code == 503
+    assert refresh.json()["error"]["code"] == "model_unavailable"
+
+
+def test_refresh_while_database_is_down_is_a_storage_error(
+    client: TestClient, models: FakeModelStore
+) -> None:
+    models.last_error = "connexion refusée"
+    models.refusal = psycopg.OperationalError
+
+    refresh = client.post("/admin/model/refresh", headers={"X-Admin-Token": "jeton-de-test"})
+
+    assert refresh.status_code == 503
+    assert refresh.json()["error"]["code"] == "storage_unavailable"
 
 
 def test_unknown_route_has_the_common_error_shape(client: TestClient) -> None:

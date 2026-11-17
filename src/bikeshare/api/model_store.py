@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 import mlflow
+from mlflow.exceptions import MlflowException
 from mlflow.tracking import MlflowClient
 from sklearn.pipeline import Pipeline
 
@@ -14,6 +15,11 @@ from bikeshare.features import FEATURE_VERSION
 logger = logging.getLogger(__name__)
 
 RegisterModel = Callable[[str, str, int, str], UUID]
+ALIAS_NOT_FOUND = ("RESOURCE_DOES_NOT_EXIST", "INVALID_PARAMETER_VALUE")
+
+
+class NoChampionError(RuntimeError):
+    pass
 
 
 class ModelRefusedError(RuntimeError):
@@ -57,14 +63,21 @@ class ModelStore:
                 changed = self._refresh()
             except Exception as e:
                 self.last_error = f"{type(e).__name__}: {e}"
-                self.registry_reachable = isinstance(e, ModelRefusedError)
+                self.registry_reachable = not isinstance(e, MlflowException)
                 raise
             self.last_error = None
             self.registry_reachable = True
             return changed
 
     def _refresh(self) -> bool:
-        target = self.client.get_model_version_by_alias(self.name, self.alias)
+        try:
+            target = self.client.get_model_version_by_alias(self.name, self.alias)
+        except MlflowException as e:
+            if e.error_code in ALIAS_NOT_FOUND:
+                raise NoChampionError(
+                    f"aucune version de {self.name} ne porte l'alias {self.alias}"
+                ) from e
+            raise
         version = int(target.version)
         status = target.tags.get("validation_status")
         if status != "approved":
