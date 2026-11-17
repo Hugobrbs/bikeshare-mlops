@@ -3,7 +3,7 @@ import logging
 import os
 import secrets
 import time
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
@@ -241,7 +241,11 @@ def create_app(
         return response
 
     async def error_response(
-        request: Request, status: int, code: str, message: str
+        request: Request,
+        status: int,
+        code: str,
+        message: str,
+        headers: Mapping[str, str] | None = None,
     ) -> JSONResponse:
         request_id: UUID = getattr(request.state, "request_id", None) or uuid4()
         should_trace = request.url.path in TRACED_ENDPOINTS and hasattr(request.state, "t0")
@@ -262,7 +266,7 @@ def create_app(
         return JSONResponse(
             status_code=status,
             content={"request_id": str(request_id), "error": {"code": code, "message": message}},
-            headers={"X-Request-ID": str(request_id)},
+            headers={**(headers or {}), "X-Request-ID": str(request_id)},
         )
 
     @app.exception_handler(ApiError)
@@ -279,7 +283,7 @@ def create_app(
     @app.exception_handler(HTTPException)
     async def on_http_error(request: Request, error: HTTPException) -> JSONResponse:
         code, message = HTTP_ERRORS.get(error.status_code, ("http_error", str(error.detail)))
-        return await error_response(request, error.status_code, code, message)
+        return await error_response(request, error.status_code, code, message, error.headers)
 
     @app.exception_handler(Exception)
     async def on_unexpected_error(request: Request, error: Exception) -> JSONResponse:

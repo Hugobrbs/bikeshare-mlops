@@ -99,6 +99,7 @@ def test_wrong_method_is_a_traced_error(client: TestClient, repository: FakeRepo
     response = client.get("/predict")
 
     assert response.status_code == 405
+    assert response.headers["allow"] == "POST"
     assert response.json()["error"]["code"] == "method_not_allowed"
     assert [(t.endpoint, t.http_status, t.error_code) for t in repository.requests] == [
         ("/predict", 405, "method_not_allowed")
