@@ -1,6 +1,6 @@
 # Scénario de démonstration
 
-Toutes les commandes se lancent depuis la racine du dépôt, stack démarrée (`make up`). Pour une démonstration, raccourcir la cadence du pipeline dans `.env` (`PIPELINE_SCHEDULE_SECONDS=300`) puis relancer `make up`. Le fichier `.env` est créé par le premier `make up` à partir de `.env.example`.
+Toutes les commandes se lancent depuis la racine du dépôt, stack démarrée (`make up`). Pour une démonstration, raccourcir la cadence du pipeline dans `.env` (`PIPELINE_SCHEDULE_SECONDS=300`) puis relancer `make up`. Le fichier `.env` est créé par le premier `make up` à partir de `.env.example`. Pour que le tag `git_commit` des runs MLflow désigne le code exécuté plutôt que `dev`, y renseigner aussi `APP_REVISION` avec le résultat de `git rev-parse --short HEAD`.
 
 Le dataset contient 24 mois. Le premier run en ingère 6, chaque run suivant un seul. Une fois tous rejoués, le pipeline n'a plus rien à ingérer et ses exécutions se terminent avec le résultat `no_new_data` : à 300 secondes, les exécutions planifiées y arrivent en une heure et demie, plus tôt si on ajoute des `make train`. Pour repartir d'une stack vide avant une démonstration :
 
@@ -16,6 +16,10 @@ Onglets à ouvrir avant de commencer :
 - Swagger : http://localhost:8001/docs
 - Grafana : http://localhost:3000 (admin / `bikeshare-local-admin`), dashboards "Bikeshare - Pipeline" et "Bikeshare - API"
 
+Dans MLflow, fermer le panneau "MLflow Assistant" qui s'ouvre à droite. Dans Grafana, replier le menu latéral : ouvert, il tronque les titres des panneaux et les colonnes des tableaux.
+
+Sur une stack vide, les sept sections se jouent en une dizaine de minutes de commandes.
+
 ## 1. Fonctionnement nominal
 
 ### Le pipeline
@@ -24,7 +28,9 @@ Onglets à ouvrir avant de commencer :
 make train
 ```
 
-Dans Prefect, le flow run `bikeshare-training` montre sept tâches dans l'ordre : acquisition, validation, preparation, entrainement, evaluation, publication, decision. Les logs de la tâche `validation` donnent le lot traité et le nombre de contrôles, ceux de `decision` le verdict de la politique.
+Dans Prefect, page "Runs", le flow run le plus récent montre sept tâches dans l'ordre (onglet "Task Runs") : acquisition, validation, preparation, entrainement, evaluation, publication, decision. Dans l'onglet "Logs", la tâche `validation` donne le lot traité et le nombre de contrôles, `decision` le verdict de la politique.
+
+La page "Deployments" montre le déploiement `replay-mensuel` et sa planification : les exécutions suivantes partent sans intervention.
 
 Dans MLflow, expérience `bikeshare-demand`, le run `train-AAAA-MM` contient :
 
@@ -85,12 +91,12 @@ Ce qu'on observe :
 1. Prefect : le flow run passe en `Failed`, la tâche `validation` est en échec, les tâches suivantes ne sont pas lancées. Pas de nouvelle tentative : rejouer un lot invalide ne le rendrait pas valide.
 2. Le lot est en quarantaine avec son rapport : `docker compose exec pipeline bikeshare data status`.
 3. MLflow : aucun nouveau run, aucune nouvelle version.
-4. Grafana, dashboard "Bikeshare - Pipeline" : exécution en échec avec le résultat `invalid_data`, lot rejeté avec les contrôles en échec (`expect_table_row_count_to_be_between`), et une ligne dans le tableau "Alertes". L'alerte est envoyée par une automation du serveur Prefect, pas par le flow.
+4. Grafana, dashboard "Bikeshare - Pipeline" : exécution en échec avec le résultat `invalid_data`, lot rejeté avec les contrôles en échec (`expect_table_row_count_to_be_between`), et une ligne dans le tableau "Alertes". L'alerte est envoyée par une automation du serveur Prefect (`bikeshare-flow-failure`, page "Automations"), pas par le flow.
 5. L'API répond toujours, avec le même champion : `curl -s localhost:8001/model`.
 
 Reprise : au cycle suivant (ou `make train`), le fournisseur relivre le même mois, propre. Le pipeline l'accepte et repart sans intervention.
 
-D'autres défauts sont disponibles, chacun attrapé par un contrôle différent :
+D'autres défauts sont disponibles, chacun attrapé par un contrôle différent. La commande dépose le lot, `make train` lance ensuite le pipeline :
 
 ```sh
 docker compose exec pipeline bikeshare data publish --corrupt negative-rentals
@@ -117,11 +123,13 @@ Le changement est tracé dans le tableau "Changements de champion" de Grafana et
 
 La version quittée est marquée `rolled_back` : relancer `make rollback` par erreur est refusé, elle ne peut plus revenir en service. Pour reculer de plusieurs versions d'un coup : `docker compose exec pipeline bikeshare registry rollback --to-version N --reason "..."`.
 
-Une version rejetée par la politique ne peut pas être promue non plus :
+Une promotion manuelle de cette version est refusée elle aussi (remplacer par le numéro de la version quittée, visible avec `make registry-status`) :
 
 ```sh
-docker compose exec pipeline bikeshare registry promote <version rejetée> --reason essai
+docker compose exec pipeline bikeshare registry promote <version quittée> --reason essai
 ```
+
+La commande répond `refusé : version N non servable (validation_status='rolled_back')`. Le refus est le même pour une version rejetée par la politique (`rejected`). En suivant ce scénario depuis une stack vide, le premier candidat rejeté est celui du mois 2011-12 : il n'y en a pas encore à cette étape.
 
 ## 4. Incident : MLflow indisponible
 
@@ -131,7 +139,7 @@ curl -s localhost:8001/health/ready
 curl -s localhost:8001/predict -H 'content-type: application/json' -d '{"observation": {"timestamp": "2012-06-15T08:00:00", "weather_code": 1, "temperature_c": 22.5, "feels_like_c": 25, "humidity_pct": 60, "windspeed_kmh": 12}}'
 ```
 
-L'API reste prête et continue de prédire avec le modèle déjà en mémoire. `/health/ready` passe à `registry_reachable: false` à la relecture suivante de l'alias, une trentaine de secondes après l'arrêt. Si on lance le pipeline pendant la panne (`make train`), le flow échoue en quelques secondes et une alerte arrive. Le lot validé juste avant reste accepté : il servira à l'entraînement suivant.
+L'API reste prête et continue de prédire avec le modèle déjà en mémoire. `/health/ready` passe à `registry_reachable: false` à la relecture suivante de l'alias, au plus tard une trentaine de secondes après l'arrêt. Si on lance le pipeline pendant la panne (`make train`), le flow échoue en quelques secondes et une alerte arrive. Le lot validé juste avant reste accepté : il servira à l'entraînement suivant.
 
 ```sh
 docker compose start mlflow
@@ -170,7 +178,7 @@ Tant que le conteneur est arrêté, Prefect garde le run à l'état `Running`. A
 make loadtest-ui
 ```
 
-Ouvrir http://localhost:8089, lancer 20 utilisateurs, puis regarder le dashboard "Bikeshare - API" : requêtes par seconde, percentiles de durée, CPU et mémoire par worker. Le filtre "Campagne" isole le tir.
+Ouvrir http://localhost:8089, lancer 20 utilisateurs, puis regarder le dashboard "Bikeshare - API" : requêtes par seconde, percentiles de durée, CPU et mémoire par worker. Le filtre "Campagne" isole le tir. La commande reste au premier plan : lancer la suite dans un second terminal.
 
 Pour alimenter les panneaux de qualité observée avec de vraies valeurs, on rejoue des heures réelles du dataset : prédiction, puis feedback avec le nombre de locations réellement constaté.
 
@@ -181,4 +189,4 @@ uv run python scripts/send_ground_truth.py --month 2011-10 --count 200
 
 La première commande télécharge le dataset sur la machine hôte (celui du pipeline est dans un volume Docker).
 
-Le panneau "MAE observée" affiche alors l'écart moyen entre prévu et réel pour la version servie.
+Le panneau "MAE observée" affiche alors l'écart moyen entre prévu et réel pour la version servie. Le panneau "Avis favorables" reste vide : ce scénario n'envoie que des valeurs observées, pas d'avis.
