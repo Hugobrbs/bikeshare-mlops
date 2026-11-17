@@ -87,10 +87,10 @@ rollback: ## Remet en service le champion précédent
 	$(PIPELINE) bikeshare registry rollback --reason "retour arrière manuel"
 
 loadtest-ui: ## Interface Locust sur http://localhost:8089
-	uv run locust -f loadtests/locustfile.py MixedUser --host http://localhost:8001
+	uv run --group loadtest locust -f loadtests/locustfile.py MixedUser --host http://localhost:8001
 
 loadtest: ## Campagne de charge complète (S, M, L) puis rapport : environ 30 minutes
 	docker compose stop pipeline
-	uv run python loadtests/run_campaign.py --name $$(date +%Y-%m-%d) --repeats 2; \
+	uv run --group loadtest python loadtests/run_campaign.py --name $$(date +%Y-%m-%d) --repeats 2; \
 		status=$$?; docker compose up -d pipeline api; exit $$status
 	uv run python loadtests/analyze.py loadtests/results/$$(date +%Y-%m-%d)

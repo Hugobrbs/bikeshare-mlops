@@ -174,6 +174,8 @@ Tant que le conteneur est arrêté, Prefect garde le run à l'état `Running`. A
 
 ## 7. Charge et supervision
 
+Cette partie se lance depuis la machine hôte et demande [uv](https://docs.astral.sh/uv/).
+
 ```sh
 make loadtest-ui
 ```

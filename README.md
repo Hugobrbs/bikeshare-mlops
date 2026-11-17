@@ -175,6 +175,8 @@ La configuration d'exécution (adresses, mots de passe, cadence) vient de l'envi
 
 ## Tests de charge
 
+Locust tourne sur la machine hôte : il faut uv, qui installe Locust au premier lancement.
+
 ```sh
 make loadtest-ui         # interface Locust sur http://localhost:8089
 make loadtest            # campagne complète : 3 configurations x 6 paliers

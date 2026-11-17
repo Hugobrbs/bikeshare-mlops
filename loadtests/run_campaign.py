@@ -136,7 +136,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--name", required=True, help="nom du dossier de résultats")
     parser.add_argument("--user-class", default="OnlineUser")
-    parser.add_argument("--duration", type=int, default=45)
+    parser.add_argument("--duration", type=int, default=40)
     parser.add_argument("--warmup", type=int, default=10)
     parser.add_argument("--repeats", type=int, default=1)
     parser.add_argument("--levels", type=int, nargs="+", default=USER_LEVELS)
