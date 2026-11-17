@@ -49,7 +49,7 @@ cd bikeshare-mlops
 make up
 ```
 
-`make up` crée `.env` à partir de `.env.example`, construit les images et démarre tout. Au premier lancement le pipeline :
+`make up` crée `.env` à partir de `.env.example`, construit les images en y inscrivant le commit courant et démarre tout. Au premier lancement le pipeline :
 
 1. télécharge le dataset depuis l'UCI et vérifie son empreinte ;
 2. ingère les six premiers mois (2011-01 à 2011-06) après contrôle qualité ;

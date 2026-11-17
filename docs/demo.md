@@ -1,6 +1,6 @@
 # Scénario de démonstration
 
-Toutes les commandes se lancent depuis la racine du dépôt, stack démarrée (`make up`). Pour une démonstration, raccourcir la cadence du pipeline dans `.env` (`PIPELINE_SCHEDULE_SECONDS=300`) puis relancer `make up`. Le fichier `.env` est créé par le premier `make up` à partir de `.env.example`. Pour que le tag `git_commit` des runs MLflow désigne le code exécuté plutôt que `dev`, y renseigner aussi `APP_REVISION` avec le résultat de `git rev-parse --short HEAD`.
+Toutes les commandes se lancent depuis la racine du dépôt, stack démarrée (`make up`). Pour une démonstration, raccourcir la cadence du pipeline dans `.env` (`PIPELINE_SCHEDULE_SECONDS=300`) puis relancer `make up`. Le fichier `.env` est créé par le premier `make up` à partir de `.env.example`. `make up` inscrit aussi le commit courant dans les images : c'est lui qu'on retrouve dans le tag `git_commit` des runs MLflow.
 
 Le dataset contient 24 mois. Le premier run en ingère 6, chaque run suivant un seul. Une fois tous rejoués, le pipeline n'a plus rien à ingérer et ses exécutions se terminent avec le résultat `no_new_data` : à 300 secondes, les exécutions planifiées y arrivent en une heure et demie, plus tôt si on ajoute des `make train`. Pour repartir d'une stack vide avant une démonstration :
 
