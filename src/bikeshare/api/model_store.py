@@ -20,6 +20,10 @@ class IncompatibleModelError(RuntimeError):
     pass
 
 
+class UnapprovedModelError(RuntimeError):
+    pass
+
+
 @dataclass(frozen=True)
 class LoadedModel:
     model_id: UUID
@@ -57,6 +61,12 @@ class ModelStore:
         version = int(target.version)
         if self.current is not None and self.current.version == version:
             return False
+
+        status = target.tags.get("validation_status")
+        if status != "approved":
+            raise UnapprovedModelError(
+                f"version {version} non servable (validation_status={status!r})"
+            )
 
         trained_with = target.tags.get("feature_version")
         if trained_with != FEATURE_VERSION:

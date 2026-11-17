@@ -7,7 +7,7 @@ import pytest
 from mlflow.exceptions import MlflowException
 from mlflow.tracking import MlflowClient
 
-from bikeshare.api.model_store import IncompatibleModelError, ModelStore
+from bikeshare.api.model_store import IncompatibleModelError, ModelStore, UnapprovedModelError
 from bikeshare.data.schema import INPUT_COLUMNS
 from bikeshare.pipeline_config import ModelConfig, TrainingConfig
 from bikeshare.registry.tracking import RegisteredVersion, TrainingRun
@@ -28,10 +28,13 @@ def registry(tracking_uri: str) -> MlflowClient:
     return MlflowClient(tracking_uri)
 
 
-def publish(uri: str, frame: pd.DataFrame, feature_version: str = "1") -> RegisteredVersion:
+def publish(
+    uri: str, frame: pd.DataFrame, feature_version: str = "1", status: str = "approved"
+) -> RegisteredVersion:
     run = TrainingRun.start(uri, "tests", "run", {})
     model = train(frame, TrainingConfig(model=ModelConfig(max_iter=10))).model
-    version = run.log_model(model, frame.head(20), NAME, {"feature_version": feature_version})
+    tags = {"feature_version": feature_version, "validation_status": status}
+    version = run.log_model(model, frame.head(20), NAME, tags)
     run.finish()
     return version
 
@@ -118,6 +121,25 @@ def test_model_trained_with_other_features_is_refused(
 
     assert store.current.version == 1
     assert "IncompatibleModelError" in store.last_error
+
+
+@pytest.mark.parametrize("status", ["rejected", "rolled_back"])
+def test_alias_moved_onto_an_unapproved_version_is_refused(
+    tracking_uri: str, registry: MlflowClient, domain_frame: pd.DataFrame, status: str
+) -> None:
+    good = publish(tracking_uri, domain_frame)
+    registry.set_registered_model_alias(NAME, "champion", good.version)
+    store, registered = make_store(tracking_uri)
+    store.refresh()
+    unapproved = publish(tracking_uri, domain_frame, status=status)
+    registry.set_registered_model_alias(NAME, "champion", unapproved.version)
+
+    with pytest.raises(UnapprovedModelError):
+        store.refresh()
+
+    assert store.current.version == 1
+    assert len(registered) == 1
+    assert status in store.last_error
 
 
 def test_registry_outage_keeps_the_loaded_model(
