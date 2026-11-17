@@ -87,6 +87,24 @@ def test_refresh_when_registry_is_down(client: TestClient, models: FakeModelStor
     assert response.json()["error"]["code"] == "registry_unavailable"
 
 
+def test_unknown_route_has_the_common_error_shape(client: TestClient) -> None:
+    response = client.get("/inconnue")
+
+    assert response.status_code == 404
+    assert response.json()["error"] == {"code": "not_found", "message": "Route inconnue."}
+    assert response.json()["request_id"] == response.headers["X-Request-ID"]
+
+
+def test_wrong_method_is_a_traced_error(client: TestClient, repository: FakeRepository) -> None:
+    response = client.get("/predict")
+
+    assert response.status_code == 405
+    assert response.json()["error"]["code"] == "method_not_allowed"
+    assert [(t.endpoint, t.http_status, t.error_code) for t in repository.requests] == [
+        ("/predict", 405, "method_not_allowed")
+    ]
+
+
 def test_openapi_documents_the_contract(client: TestClient) -> None:
     schema = client.get("/openapi.json").json()
 
