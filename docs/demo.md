@@ -1,8 +1,8 @@
 # Scénario de démonstration
 
-Toutes les commandes se lancent depuis la racine du dépôt, stack démarrée (`make up`). Pour une démonstration, raccourcir la cadence du pipeline dans `.env` (`PIPELINE_SCHEDULE_SECONDS=120`) puis relancer `make up`.
+Toutes les commandes se lancent depuis la racine du dépôt, stack démarrée (`make up`). Pour une démonstration, raccourcir la cadence du pipeline dans `.env` (`PIPELINE_SCHEDULE_SECONDS=300`) puis relancer `make up`. Le fichier `.env` est créé par le premier `make up` à partir de `.env.example`.
 
-Le dataset contient 24 mois. Une fois tous rejoués, le pipeline n'a plus rien à ingérer et ses exécutions se terminent avec le résultat `no_new_data`. Pour repartir d'une stack vide avant une démonstration :
+Le dataset contient 24 mois. Le premier run en ingère 6, chaque run suivant un seul. Une fois tous rejoués, le pipeline n'a plus rien à ingérer et ses exécutions se terminent avec le résultat `no_new_data` : à 300 secondes, les exécutions planifiées y arrivent en une heure et demie, plus tôt si on ajoute des `make train`. Pour repartir d'une stack vide avant une démonstration :
 
 ```sh
 make reset
@@ -48,7 +48,7 @@ curl -s localhost:8001/predict -H 'content-type: application/json' -d '{
 }'
 ```
 
-La réponse contient la version exacte du modèle et un `prediction_id`. On envoie la valeur réellement observée pour cette prédiction (remplacer l'identifiant) :
+La réponse contient la version exacte du modèle et, dans `prediction`, un `prediction_id`. On envoie la valeur réellement observée pour cette prédiction (remplacer l'identifiant) :
 
 ```sh
 curl -s -i localhost:8001/feedback -H 'content-type: application/json' -d '{
@@ -60,7 +60,7 @@ curl -s -i localhost:8001/feedback -H 'content-type: application/json' -d '{
 }'
 ```
 
-Première fois : `201`. La même commande rejouée : `200` avec `already_recorded`, sans doublon. Avec une autre valeur : `409`.
+Première fois : `201`. La même commande rejouée : `200` avec `already_recorded`, sans doublon. Avec une autre valeur : `409`. Si le scénario a déjà été joué sur cette stack, changer le `feedback_id`, sinon la première réponse est aussi un `409`.
 
 Entrée invalide (`weather_code` à 9) : `422` avec un `request_id`, et la requête apparaît quand même dans le panneau "Erreurs par endpoint" de Grafana.
 
@@ -131,7 +131,7 @@ curl -s localhost:8001/health/ready
 curl -s localhost:8001/predict -H 'content-type: application/json' -d '{"observation": {"timestamp": "2012-06-15T08:00:00", "weather_code": 1, "temperature_c": 22.5, "feels_like_c": 25, "humidity_pct": 60, "windspeed_kmh": 12}}'
 ```
 
-L'API reste prête et continue de prédire avec le modèle déjà en mémoire. `/health/ready` indique `registry_reachable: false`. Si on lance le pipeline pendant la panne (`make train`), le flow échoue en quelques secondes et une alerte arrive. Le lot validé juste avant reste accepté : il servira à l'entraînement suivant.
+L'API reste prête et continue de prédire avec le modèle déjà en mémoire. `/health/ready` passe à `registry_reachable: false` à la relecture suivante de l'alias, une trentaine de secondes après l'arrêt. Si on lance le pipeline pendant la panne (`make train`), le flow échoue en quelques secondes et une alerte arrive. Le lot validé juste avant reste accepté : il servira à l'entraînement suivant.
 
 ```sh
 docker compose start mlflow
@@ -157,11 +157,12 @@ L'API redevient prête toute seule.
 ## 6. Incident : le pipeline est tué en plein run
 
 ```sh
-make train && docker compose kill pipeline
-docker compose up -d pipeline
+make incident-crash
 ```
 
-Si le conteneur est tué pendant une exécution, Prefect garde le run à l'état `Running`. Au redémarrage, le conteneur repère ces runs orphelins et les passe en `Crashed` : l'alerte part et l'exécution apparaît en échec (`crashed`) dans Grafana. Une exécution dure quelques secondes, il faut donc enchaîner les deux commandes rapidement.
+La commande lance un run, attend le début de l'entraînement, tue le conteneur du pipeline puis le redémarre. Une exécution dure quelques secondes : tué à la main, le conteneur s'arrête le plus souvent avant que le run ait démarré, et le run s'exécute alors normalement au redémarrage.
+
+Tant que le conteneur est arrêté, Prefect garde le run à l'état `Running`. Au redémarrage, le conteneur repère ces runs orphelins et les passe en `Crashed` : l'alerte part, l'exécution apparaît en échec (`crashed`) dans Grafana et le run MLflow resté ouvert est clos avec le statut `KILLED`. Le lot validé avant l'arrêt reste accepté : il servira à l'entraînement suivant.
 
 ## 7. Charge et supervision
 

@@ -123,5 +123,5 @@ Le modèle est sérialisé au format skops plutôt que pickle : au chargement, s
 | Modèle moins bon que la baseline ou que le champion | version marquée `rejected` ou non promue. Ce n'est pas une panne : l'exécution est `Completed`, sans alerte |
 | MLflow arrêté | le flow échoue en quelques secondes (les tentatives du client MLflow sont bornées) avec alerte. Le lot déjà validé reste accepté et servira à l'entraînement suivant. L'API continue avec le modèle en mémoire ; un worker qui redémarre pendant la panne reste non prêt jusqu'au retour de MLflow |
 | PostgreSQL arrêté | l'API répond 503 en une seconde au plus (jamais de prédiction sans trace), `/health/ready` passe à 503, `/health/live` reste à 200 et l'erreur est journalisée avec son `request_id`. Reprise automatique quelques secondes après le retour de la base |
-| Conteneur du pipeline tué en plein run | Prefect ne s'en aperçoit pas seul : le run reste `Running`. Au redémarrage, le conteneur passe ces runs en `Crashed`, ce qui déclenche l'alerte |
+| Conteneur du pipeline tué en plein run | Prefect ne s'en aperçoit pas seul : le run reste `Running`. Au redémarrage, le conteneur passe ces runs en `Crashed`, ce qui déclenche l'alerte, et clôt leur run MLflow resté ouvert (`KILLED`) |
 | Worker de l'API tué | Docker (ou uvicorn s'il y a plusieurs workers) le relance, il recharge le champion |

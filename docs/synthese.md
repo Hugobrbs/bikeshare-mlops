@@ -82,7 +82,7 @@ Tout ce qui suit a été observé sur la stack Docker complète, démarrée à v
 | Entrée invalide | 422 avec `request_id`, tracée en base avec son code d'erreur, aucune prédiction enregistrée |
 | MLflow arrêté | l'API continue de prédire (`registry_reachable: false`). Un run lancé pendant la panne échoue en 5 secondes, avec alerte |
 | PostgreSQL arrêté | `/health/ready` et `/predict` répondent 503 (tout de suite pour la première requête, puis après une seconde d'attente d'une connexion), `/health/live` reste à 200, erreur journalisée avec son `request_id`. API de nouveau prête 6 secondes après le redémarrage de la base |
-| Conteneur du pipeline tué en plein run | au redémarrage, le run resté `Running` passe en `Crashed` et l'alerte arrive dans la seconde |
+| Conteneur du pipeline tué en plein run | au redémarrage, le run resté `Running` passe en `Crashed`, l'alerte arrive dans la seconde et le run MLflow resté ouvert est clos (`KILLED`) |
 | Valeurs réelles renvoyées en feedback | 150 heures d'octobre 2011 prédites par la v3 puis comparées au réel : MAE observée de 33,9, affichée dans Grafana |
 
 Les mêmes scénarios sont couverts par les tests automatisés :

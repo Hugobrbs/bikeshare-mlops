@@ -134,7 +134,7 @@ La version quittée par un retour arrière est marquée `rolled_back` : elle ne 
 
 ## Démonstration
 
-Le scénario complet (fonctionnement nominal, lot invalide, retour arrière, panne de MLflow, panne de PostgreSQL) est décrit pas à pas dans [docs/demo.md](docs/demo.md). Le plus court :
+Le scénario complet (fonctionnement nominal, lot invalide, retour arrière, panne de MLflow, panne de PostgreSQL, pipeline tué en plein run, charge) est décrit pas à pas dans [docs/demo.md](docs/demo.md). Le plus court :
 
 ```sh
 make incident-data       # dépose un lot tronqué et lance le pipeline
