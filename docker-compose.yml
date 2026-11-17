@@ -124,7 +124,9 @@ services:
     environment:
       <<: *common-env
       PREFECT_API_URL: http://prefect:4200/api
+      PREFECT_UI_URL: http://localhost:${PREFECT_PORT:-4200}
       PREFECT_LOGGING_EXTRA_LOGGERS: bikeshare
+      PREFECT_LOGGING_TO_API_WHEN_MISSING_FLOW: ignore
       OPS_DATABASE_URL: postgresql://pipeline_writer:${OPS_DB_PASSWORD:-bikeshare-local-pipeline}@postgres:5432/bikeshare
       PIPELINE_SCHEDULE_SECONDS: ${PIPELINE_SCHEDULE_SECONDS:-600}
       ALERT_SINK_URL: http://alert-sink:8002/alerts

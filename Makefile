@@ -1,6 +1,7 @@
 .DEFAULT_GOAL := help
 .PHONY: help install lint format test test-integration cov audit clean \
-	up down reset ps logs train incident-data registry-status rollback loadtest-ui loadtest
+	up down reset ps logs train incident-data incident-crash registry-status rollback \
+	loadtest-ui loadtest
 
 PIPELINE = docker compose exec pipeline
 TEST_DB = postgresql://postgres:test@127.0.0.1:55432/bikeshare_test
@@ -65,6 +66,19 @@ train: ## Déclenche tout de suite un cycle d'entraînement
 incident-data: ## Incident contrôlé : dépose un lot invalide puis lance le pipeline
 	$(PIPELINE) bikeshare data publish --corrupt missing-hours
 	$(PIPELINE) prefect deployment run bikeshare-training/replay-mensuel
+
+incident-crash: ## Incident contrôlé : tue le pipeline pendant l'entraînement puis le redémarre
+	@run=$$(docker compose exec -T pipeline prefect deployment run bikeshare-training/replay-mensuel \
+		| sed -n "s/.*Created flow run '\(.*\)'.*/\1/p"); \
+	echo "run $$run créé, attente de l'entraînement"; \
+	for i in $$(seq 1 60); do \
+		docker compose logs --since 2m pipeline 2>&1 \
+			| grep -A 30 "Beginning flow run '$$run'" | grep -q "lignes, test" && exit 0; \
+		sleep 0.5; \
+	done; \
+	echo "le run $$run n'a pas atteint l'entraînement"; exit 1
+	docker compose kill pipeline
+	docker compose up -d pipeline
 
 registry-status: ## Versions du modèle, statut et alias
 	$(PIPELINE) bikeshare registry status
