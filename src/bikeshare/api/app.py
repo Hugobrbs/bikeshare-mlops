@@ -19,7 +19,7 @@ from starlette.exceptions import HTTPException
 
 from bikeshare import __version__
 from bikeshare.api.errors import ApiError, model_unavailable, storage_unavailable
-from bikeshare.api.model_store import LoadedModel, ModelStore
+from bikeshare.api.model_store import LoadedModel, ModelRefusedError, ModelStore
 from bikeshare.api.repository import FeedbackRow, PredictionRow, RequestTrace, TraceRepository
 from bikeshare.api.schemas import (
     BatchPredictRequest,
@@ -53,6 +53,7 @@ indique la version exacte utilisée, et chaque prédiction peut recevoir un feed
 
 Toutes les erreurs ont la même forme :
 `{"request_id": "...", "error": {"code": "...", "message": "..."}}`.
+Seule la sonde `/health/ready` répond 503 avec son propre corps, qui détaille son état.
 """
 
 TAGS = [
@@ -363,6 +364,7 @@ def create_app(
         tags=["Modèle"],
         responses={
             401: {"model": ErrorResponse, "description": "Jeton absent ou invalide"},
+            409: {"model": ErrorResponse, "description": "Version désignée par l'alias refusée"},
             503: ERRORS[503],
         },
     )
@@ -383,6 +385,8 @@ def create_app(
             raise ApiError(401, "unauthorized", "Jeton d'administration absent ou invalide.")
         try:
             service.models.refresh()
+        except ModelRefusedError as e:
+            raise ApiError(409, "model_refused", str(e)) from e
         except Exception as e:
             raise ApiError(503, "registry_unavailable", "Registre de modèles injoignable.") from e
         return served_model(service)
@@ -405,7 +409,7 @@ def create_app(
             status="ok",
             model_loaded=service.models.current is not None,
             database=service.repository.ping(),
-            registry_reachable=service.models.last_error is None,
+            registry_reachable=service.models.registry_reachable,
             detail=service.models.last_error,
         )
         if not (health.model_loaded and health.database):

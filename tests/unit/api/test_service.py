@@ -87,6 +87,23 @@ def test_refresh_when_registry_is_down(client: TestClient, models: FakeModelStor
     assert response.json()["error"]["code"] == "registry_unavailable"
 
 
+def test_refused_champion_is_not_reported_as_a_registry_outage(
+    client: TestClient, models: FakeModelStore
+) -> None:
+    models.last_error = "version 4 non servable (validation_status='rolled_back')"
+    models.refused = True
+
+    ready = client.get("/health/ready")
+    refresh = client.post("/admin/model/refresh", headers={"X-Admin-Token": "jeton-de-test"})
+
+    assert ready.status_code == 200
+    assert ready.json()["registry_reachable"] is True
+    assert "non servable" in ready.json()["detail"]
+    assert refresh.status_code == 409
+    assert refresh.json()["error"]["code"] == "model_refused"
+    assert "non servable" in refresh.json()["error"]["message"]
+
+
 def test_unknown_route_has_the_common_error_shape(client: TestClient) -> None:
     response = client.get("/inconnue")
 

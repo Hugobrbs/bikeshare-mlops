@@ -29,11 +29,13 @@ def registry(tracking_uri: str) -> MlflowClient:
 
 
 def publish(
-    uri: str, frame: pd.DataFrame, feature_version: str = "1", status: str = "approved"
+    uri: str, frame: pd.DataFrame, feature_version: str = "1", status: str | None = "approved"
 ) -> RegisteredVersion:
     run = TrainingRun.start(uri, "tests", "run", {})
     model = train(frame, TrainingConfig(model=ModelConfig(max_iter=10))).model
-    tags = {"feature_version": feature_version, "validation_status": status}
+    tags = {"feature_version": feature_version}
+    if status:
+        tags["validation_status"] = status
     version = run.log_model(model, frame.head(20), NAME, tags)
     run.finish()
     return version
@@ -123,9 +125,9 @@ def test_model_trained_with_other_features_is_refused(
     assert "IncompatibleModelError" in store.last_error
 
 
-@pytest.mark.parametrize("status", ["rejected", "rolled_back"])
+@pytest.mark.parametrize("status", ["rejected", "rolled_back", None])
 def test_alias_moved_onto_an_unapproved_version_is_refused(
-    tracking_uri: str, registry: MlflowClient, domain_frame: pd.DataFrame, status: str
+    tracking_uri: str, registry: MlflowClient, domain_frame: pd.DataFrame, status: str | None
 ) -> None:
     good = publish(tracking_uri, domain_frame)
     registry.set_registered_model_alias(NAME, "champion", good.version)
@@ -139,7 +141,42 @@ def test_alias_moved_onto_an_unapproved_version_is_refused(
 
     assert store.current.version == 1
     assert len(registered) == 1
-    assert status in store.last_error
+    assert repr(status) in store.last_error
+    assert store.registry_reachable is True
+
+
+def test_unapproved_champion_is_not_loaded_at_startup(
+    tracking_uri: str, registry: MlflowClient, domain_frame: pd.DataFrame
+) -> None:
+    rejected = publish(tracking_uri, domain_frame, status="rejected")
+    registry.set_registered_model_alias(NAME, "champion", rejected.version)
+    store, registered = make_store(tracking_uri)
+
+    with pytest.raises(UnapprovedModelError):
+        store.refresh()
+
+    assert store.current is None
+    assert registered == []
+
+
+def test_served_version_losing_its_approval_is_reported(
+    tracking_uri: str, registry: MlflowClient, domain_frame: pd.DataFrame
+) -> None:
+    version = publish(tracking_uri, domain_frame)
+    registry.set_registered_model_alias(NAME, "champion", version.version)
+    store, _ = make_store(tracking_uri)
+    store.refresh()
+    registry.set_model_version_tag(NAME, version.version, "validation_status", "rolled_back")
+
+    with pytest.raises(UnapprovedModelError):
+        store.refresh()
+
+    assert store.current.version == 1
+    assert "rolled_back" in store.last_error
+
+    registry.set_model_version_tag(NAME, version.version, "validation_status", "approved")
+    assert store.refresh() is False
+    assert store.last_error is None
 
 
 def test_registry_outage_keeps_the_loaded_model(
@@ -162,3 +199,4 @@ def test_registry_outage_keeps_the_loaded_model(
 
     assert store.current.version == 1
     assert store.last_error is not None
+    assert store.registry_reachable is False

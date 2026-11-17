@@ -16,11 +16,15 @@ logger = logging.getLogger(__name__)
 RegisterModel = Callable[[str, str, int, str], UUID]
 
 
-class IncompatibleModelError(RuntimeError):
+class ModelRefusedError(RuntimeError):
     pass
 
 
-class UnapprovedModelError(RuntimeError):
+class IncompatibleModelError(ModelRefusedError):
+    pass
+
+
+class UnapprovedModelError(ModelRefusedError):
     pass
 
 
@@ -44,6 +48,7 @@ class ModelStore:
         self.client = MlflowClient(tracking_uri)
         self.current: LoadedModel | None = None
         self.last_error: str | None = None
+        self.registry_reachable = True
         self._lock = threading.Lock()
 
     def refresh(self) -> bool:
@@ -52,21 +57,22 @@ class ModelStore:
                 changed = self._refresh()
             except Exception as e:
                 self.last_error = f"{type(e).__name__}: {e}"
+                self.registry_reachable = isinstance(e, ModelRefusedError)
                 raise
             self.last_error = None
+            self.registry_reachable = True
             return changed
 
     def _refresh(self) -> bool:
         target = self.client.get_model_version_by_alias(self.name, self.alias)
         version = int(target.version)
-        if self.current is not None and self.current.version == version:
-            return False
-
         status = target.tags.get("validation_status")
         if status != "approved":
             raise UnapprovedModelError(
                 f"version {version} non servable (validation_status={status!r})"
             )
+        if self.current is not None and self.current.version == version:
+            return False
 
         trained_with = target.tags.get("feature_version")
         if trained_with != FEATURE_VERSION:
