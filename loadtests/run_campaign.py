@@ -105,7 +105,9 @@ def locust(
         f"--headless -u {users} -r {users} -t {duration}s --only-summary "
         f"--processes {LOCUST_PROCESSES}"
     ).split()
-    if csv_prefix:
+    stats = Path(f"{csv_prefix}_stats.csv") if csv_prefix else None
+    if stats:
+        stats.unlink(missing_ok=True)
         command += ["--csv", str(csv_prefix)]
     # code de sortie 1 = des requêtes en échec, pas une erreur du script
     result = subprocess.run(
@@ -115,7 +117,7 @@ def locust(
         capture_output=True,
         text=True,
     )
-    if result.returncode not in (0, 1):
+    if result.returncode not in (0, 1) or (stats and not stats.exists()):
         raise RuntimeError(f"Locust n'a pas tourné : {result.stderr.strip()[-300:]}")
 
 
