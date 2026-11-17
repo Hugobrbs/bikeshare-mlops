@@ -95,6 +95,32 @@ La CI lance les deux niveaux sur chaque PR, avec l'audit des dépendances et la 
 
 Ce qui dépend des conteneurs ne se vérifie qu'avec le scénario de [demo.md](demo.md) : l'alerte de bout en bout (automation Prefect, webhook, ligne dans `ops.alerts`), l'arrêt de MLflow ou de PostgreSQL et le pipeline tué en plein run.
 
+### Captures
+
+Prises le 17 novembre 2026 sur une stack démarrée depuis un clone neuf, après le scénario de [demo.md](demo.md).
+
+Exécution nominale dans Prefect, les sept tâches dans l'ordre :
+
+![Flow run réussi dans Prefect](captures/prefect-execution.jpg)
+
+Lot invalide : l'exécution s'arrête à la validation, les étapes suivantes ne sont pas lancées :
+
+![Flow run en échec dans Prefect](captures/prefect-lot-invalide.jpg)
+
+Registre MLflow : chaque version porte le verdict de la politique (`approved`, `rejected`, `rolled_back`) et ses raisons :
+
+![Versions du modèle dans MLflow](captures/mlflow-versions.jpg)
+
+Dashboard "Bikeshare - Pipeline" : exécutions, lots contrôlés, changements de champion et alertes :
+
+![Dashboard du pipeline, exécutions](captures/grafana-pipeline.jpg)
+
+![Dashboard du pipeline, lots, champion et alertes](captures/grafana-pipeline-alertes.jpg)
+
+Dashboard "Bikeshare - API" : trafic, erreurs par code et version servie :
+
+![Dashboard de l'API](captures/grafana-api.jpg)
+
 ## Ce que le rejeu des 24 mois a montré
 
 Le dataset a été rejoué en entier sur la stack, un mois toutes les deux minutes. 12 versions du modèle ont été entraînées : 10 promues, 2 rejetées par la politique.
